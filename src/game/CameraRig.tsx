@@ -6,7 +6,7 @@
 import { useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { cam, frameDt } from './actors';
+import { cam, coach, frameDt } from './actors';
 import { motion } from './settings';
 import { clamp, damp, lerp, smoothstep } from '../three/util';
 
@@ -28,6 +28,8 @@ const goalPos = new THREE.Vector3();
 const goalTarget = new THREE.Vector3();
 const dir = new THREE.Vector3();
 const fwd = new THREE.Vector3();
+const right = new THREE.Vector3();
+const toCoach = new THREE.Vector3();
 
 export function boardGoal(aspect: number, outPos: THREE.Vector3, outTarget: THREE.Vector3) {
   const k = smoothstep(0.55, 1.5, aspect);
@@ -42,6 +44,13 @@ export function boardGoal(aspect: number, outPos: THREE.Vector3, outTarget: THRE
   outTarget.y = boardView.anchor.y + lerp(-0.6, 0.1, k);
   outPos.copy(boardView.anchor).addScaledVector(fwd, -dist);
   outPos.y = boardView.anchor.y + height;
+  // on a tall screen the underpants meter covers the right edge, so when
+  // Coach Rex stands on the right, slide the view to bring him out from behind it
+  right.set(-fwd.z, 0, fwd.x);
+  const coachSide = coach.visible ? toCoach.copy(coach.pos).sub(boardView.anchor).dot(right) : 0;
+  const slide = coachSide > 0.8 ? (1 - k) * 0.7 : 0;
+  outTarget.addScaledVector(right, slide);
+  outPos.addScaledVector(right, slide);
 }
 
 export function CameraRig() {

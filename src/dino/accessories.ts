@@ -686,7 +686,10 @@ export function buildWornUnderpants(design: UnderpantsDesign, species: Species):
   const quad = species !== 'trex';
   const holder = new THREE.Group();
   holder.add(m(shell, base, [0, 0, 0], [0, 0, 0], [1, 1, 1]));
-  holder.add(m(G.torus(), band, [0, 0.5, 0], [Math.PI / 2, 0, 0], [1.02, 1.02, 0.35]));
+  // a slim rolled edge that hugs the shell (radius 1 at the top, 0.92 at the legs)
+  const roll = cachedGeo('worn-roll', () => new THREE.TorusGeometry(1, 0.06, 8, 40));
+  const rim = (y: number) => 0.96 + 0.08 * y;
+  holder.add(m(roll, band, [0, 0.5, 0], [Math.PI / 2, 0, 0], [1, 1, 1.5]));
   // the pattern on the front and back
   const n = design.motif === 'stripes' ? 0 : 5;
   for (let i = 0; i < n; i++) {
@@ -699,7 +702,10 @@ export function buildWornUnderpants(design: UnderpantsDesign, species: Species):
     holder.add(piece);
   }
   if (design.motif === 'stripes') {
-    ['#ff922b', '#ffd43b', '#51cf66', '#4dabf7'].forEach((c, i) => holder.add(m(G.torus(), plastic(c, 0.6), [0, 0.28 - i * 0.18, 0], [Math.PI / 2, 0, 0], [0.995, 0.995, 0.22])));
+    ['#ff922b', '#ffd43b', '#51cf66', '#4dabf7'].forEach((c, i) => {
+      const y = 0.28 - i * 0.18;
+      holder.add(m(roll, plastic(c, 0.6), [0, y, 0], [Math.PI / 2, 0, 0], [rim(y), rim(y), 1.4]));
+    });
   }
   if (quad) {
     // round the back of a four-legged dino, axis along the body
