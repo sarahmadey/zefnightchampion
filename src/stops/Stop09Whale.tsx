@@ -3,7 +3,8 @@
 // glow ring brighter. After eight pops a whale made of shimmering bubbles
 // rises, smiles, winks and spouts a fizzy fountain before sinking back.
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { debugState, debugTargets } from '../game/debugTargets';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { StopFrame, useStop } from './common';
@@ -182,6 +183,13 @@ export function Stop09Whale() {
     burst('heart', e.point, { count: 4 });
     st.whaleT = Math.min(st.whaleT, 6);
   };
+
+  useEffect(() => {
+    debugState.set('whale', () => ({ pops: st.pops, whaleT: st.whaleT }));
+    debugTargets.set('fizzBubbles', () =>
+      bubbles.current.filter((g, i) => g && g.visible && st.b[i].popT < 0).map((g) => g!.getWorldPosition(new THREE.Vector3())),
+    );
+  }, [st]);
 
   const nextBubble = st.b.findIndex((b) => b.popT < 0);
   const hb = st.b[Math.max(0, nextBubble)];

@@ -47,7 +47,9 @@ export function CameraRig() {
   const size = useThree((s) => s.size);
   const scene = useGame((s) => s.scene);
   const cur = useRef({ pos: new THREE.Vector3(0, 4, 14), target: new THREE.Vector3(0, 1, 0), init: false, t: 0 });
-  (window as unknown as { __camera?: THREE.Camera }).__camera = camera;
+  const gl = useThree((s) => s.gl);
+  (window as unknown as { __camera?: THREE.Camera; __renderer?: THREE.WebGLRenderer }).__camera = camera;
+  (window as unknown as { __renderer?: THREE.WebGLRenderer }).__renderer = gl;
 
   useFrame((_, rawDt) => {
     const dt = frameDt(rawDt);

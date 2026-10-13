@@ -5,9 +5,10 @@ import * as THREE from 'three';
 import { cam, pip, timeScale, zef } from './game/actors';
 import { useGame, useSave } from './state/store';
 import { addDays, todayKey } from './state/progress';
-import { stopWorldPoints } from './world/stopDefs';
+import { localToWorld, stopWorldPoints } from './world/stopDefs';
 import { startPreview, endPreview } from './game/director';
 import { placeAtStop } from './game/world';
+import { debugState, debugTargets } from './game/debugTargets';
 
 export function installDebug() {
   if (typeof window === 'undefined' || !new URLSearchParams(location.search).has('debug')) return;
@@ -41,6 +42,21 @@ export function installDebug() {
     goto(i: number, lit = 15) {
       useGame.getState().set({ litStop: lit, cutscene: null });
       placeAtStop(i);
+    },
+    localScreen(stop: number, x: number, y: number, z: number) {
+      return api.project(localToWorld(stop, [x, y, z]));
+    },
+    state(name: string) {
+      const f = debugState.get(name);
+      return f ? f() : null;
+    },
+    targets(name: string) {
+      const f = debugTargets.get(name);
+      return f ? f().map((p) => api.project(p)) : [];
+    },
+    info() {
+      const r = (window as unknown as { __renderer?: THREE.WebGLRenderer }).__renderer;
+      return r ? { calls: r.info.render.calls, triangles: r.info.render.triangles, geometries: r.info.memory.geometries, textures: r.info.memory.textures, programs: r.info.programs?.length } : null;
     },
     stopScreen(i: number, which: 'object' | 'zef' | 'light' = 'object') {
       const w = stopWorldPoints(i);

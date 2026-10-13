@@ -3,7 +3,8 @@
 // and five of them turn into a wobbly sheep with a face, ears and stick legs
 // that baas, hops and floats off to the sky. A bubble wand blows new ones.
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { debugTargets } from '../game/debugTargets';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { StopFrame, createDrag, useStop, type DragOpts } from './common';
@@ -217,6 +218,11 @@ export function Stop05BubbleSheep() {
     burst('heart', e.point, { count: 3 });
     if (st.floatAway === 0) st.sheepT = Math.max(st.sheepT, 5.5);
   };
+
+  useEffect(() => {
+    debugTargets.set('sheepBubbles', () => bubbles.filter((b) => b.state === 'float' && b.spawn <= 0).map((b) => localToWorld(ID, [b.pos.x, b.pos.y, b.pos.z])));
+    debugTargets.set('sheepCluster', () => [localToWorld(ID, [cluster.x, cluster.y, cluster.z])]);
+  }, [bubbles, cluster]);
 
   const free = bubbles.findIndex((b) => b.state === 'float' && b.spawn <= 0);
   const hintFrom = free >= 0 ? bubbles[free].home : new THREE.Vector3(ox + 1, oy, oz);

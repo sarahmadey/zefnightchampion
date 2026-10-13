@@ -39,7 +39,7 @@ function Fireworks() {
           ['#69db7c', '#ffd43b', '#d3f9d8'],
           ['#ff8787', '#ffa94d', '#ffe8cc'],
         ][k % 4];
-        const p = CASTLE_POS.clone().add(new THREE.Vector3((Math.random() - 0.5) * 18, 20 + Math.random() * 8, (Math.random() - 0.5) * 8));
+        const p = CASTLE_POS.clone().add(new THREE.Vector3((Math.random() - 0.5) * 18, 13 + Math.random() * 7, (Math.random() - 0.5) * 8));
         burst('sparkle', p, { count: 46, speed: 7, up: 0.5, gravity: -1.2, life: 1.9, size: 0.42, colors, spread: 1.2 });
         burst('confetti', p, { count: 20, speed: 5, up: 1, colors });
       }),

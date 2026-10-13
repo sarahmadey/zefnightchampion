@@ -33,6 +33,8 @@ import { motion } from '../game/settings';
 
 export const CASTLE_POS = new THREE.Vector3(0, CASTLE_BASE_Y, -153);
 
+const FLASH = ['#ffd1f0', '#fff6c2', '#c8ffe9', '#d6e4ff', '#ffe0c2'].map((c) => new THREE.Color(c).multiplyScalar(1.25));
+
 interface Tower {
   x: number;
   z: number;
@@ -384,6 +386,7 @@ export function Castle({ awake, towersActive, doorsActive, onDoorsOpened, onTowe
   const st = useMemo(
     () => ({
       lit: new Float32Array(specs.length),
+      flash: new Float32Array(specs.length),
       target: new Float32Array(specs.length),
       delay: new Float32Array(specs.length).fill(-1),
       hold: new Float32Array(specs.length),
@@ -487,6 +490,7 @@ export function Castle({ awake, towersActive, doorsActive, onDoorsOpened, onTowe
         st.delay[i] -= dt;
         if (st.delay[i] < 0) {
           st.target[i] = 1;
+          st.flash[i] = 1;
           const wp = w.pos.clone().add(CASTLE_POS);
           if (!motion.reduced && Math.random() < 0.5) burst('sparkle', wp, { count: 3, size: 0.18 });
         }
@@ -499,8 +503,11 @@ export function Castle({ awake, towersActive, doorsActive, onDoorsOpened, onTowe
       if (awake) want = 1;
       if (st.wakeT >= 0) want = Math.max(want, st.wakeT * 3.2 > w.pos.y - 0.5 ? 1 : 0);
       st.lit[i] = THREE.MathUtils.damp(st.lit[i], want, 6, dt);
+      st.flash[i] = Math.max(0, st.flash[i] - dt * 0.7);
       const tw = awake ? 0.9 + 0.1 * Math.sin(time * 2 + i * 1.7) : 1;
       tmpC.copy(dark).lerp(warm, st.lit[i] * tw);
+      // a tapped tower sends a bright wave of colour up its windows
+      if (st.flash[i] > 0) tmpC.lerp(FLASH[w.tower % FLASH.length], Math.min(1, st.flash[i] * 1.4));
       winRef.current.setColorAt(i, tmpC);
     }
     if (winRef.current.instanceColor) winRef.current.instanceColor.needsUpdate = true;

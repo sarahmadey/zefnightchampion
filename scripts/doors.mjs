@@ -1,0 +1,30 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 900, height: 650 }, deviceScaleFactor: 1 });
+const logs = [];
+page.on('console', (m) => { const t = m.text(); if (!/vite|DevTools|THREE.Clock/.test(t)) logs.push(`[${m.type()}] ${t}`); });
+page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
+await page.addInitScript(() => localStorage.setItem('zefs-dry-night-quest:welcomed', '1'));
+await page.goto('http://127.0.0.1:5173/?debug&noevents&lit=14&speed=1', { waitUntil: 'load' });
+await page.waitForTimeout(6000);
+await page.evaluate(() => window.__zef.goto(14, 14));
+await page.waitForTimeout(3500);
+await page.screenshot({ path: 'scripts/out/castle14-01-before.png', timeout: 120000 });
+const tower = await page.evaluate(() => { const z = window.__zef; return z.project(new (z.cam.pos.constructor)(-2.75, 6.5 + 4.5, -153 + 8.75 + 1.25)); });
+await page.mouse.click(tower.x, tower.y);
+await page.waitForTimeout(1600);
+await page.screenshot({ path: 'scripts/out/castle14-02-wave.png', timeout: 120000 });
+await page.waitForTimeout(2500);
+await page.screenshot({ path: 'scripts/out/castle14-03-lit.png', timeout: 120000 });
+process.exit(0);
+await page.evaluate(() => window.__zef.goto(15, 15));
+await page.waitForTimeout(3500);
+const door = await page.evaluate(() => { const z = window.__zef; return z.project(new (z.cam.pos.constructor)(0, 6.5 + 2, -153 + 8.6)); });
+await page.mouse.click(door.x, door.y);
+for (let i = 1; i <= 5; i++) {
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: `scripts/out/castle15-0${i}.png`, timeout: 120000 });
+  console.log(i, JSON.stringify(await page.evaluate(() => ({ scene: window.__zef.game().scene, cut: window.__zef.game().cutscene, fade: window.__zef.game().fade }))));
+}
+console.log(logs.slice(0, 20).join('\n'));
+await browser.close();

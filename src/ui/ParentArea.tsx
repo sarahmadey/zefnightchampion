@@ -4,6 +4,7 @@
 // progress, and backups can be exported or imported.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useGame, useSave } from '../state/store';
 import {
   addDays,
@@ -70,15 +71,17 @@ export function ParentButton() {
           <circle cx="24" cy="24" r="21" />
         </svg>
       </button>
-      {gate && (
-        <Gate
-          onPass={() => {
-            setGate(false);
-            useGame.getState().set({ parentOpen: true });
-          }}
-          onCancel={() => setGate(false)}
-        />
-      )}
+      {gate &&
+        createPortal(
+          <Gate
+            onPass={() => {
+              setGate(false);
+              useGame.getState().set({ parentOpen: true });
+            }}
+            onCancel={() => setGate(false)}
+          />,
+          document.body,
+        )}
     </>
   );
 }

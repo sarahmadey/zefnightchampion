@@ -144,9 +144,9 @@ export function Stop13Lanterns() {
 /** Stop 14: the castle towers react to taps; this adds the hint. */
 export function Stop14Towers() {
   const s = useStop(14);
-  const t = TOWERS[2];
-  const p = CASTLE_POS.clone().add(new THREE.Vector3(t.x + 0.4, t.h * 0.55, t.z + t.r + 0.8));
-  return <HintHand visible={s.hint} gesture="tap" from={[p.x, p.y, p.z]} scale={3.2} />;
+  const t = TOWERS[0];
+  const p = CASTLE_POS.clone().add(new THREE.Vector3(t.x - 0.3, t.h * 0.5, t.z + t.r + 0.8));
+  return <HintHand visible={s.hint} gesture="tap" from={[p.x, p.y, p.z]} scale={2.6} />;
 }
 
 /** Stop 15: the castle doors open; this adds the hint. */

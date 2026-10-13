@@ -138,9 +138,9 @@ export function Stop04Cloud() {
       return;
     }
     if (st.phase === 'bouncing') {
-      st.combo = Math.min(4, st.combo + 1);
+      st.combo = Math.min(3, st.combo + 1);
       // a tap while landing or rising gives a bigger, still gentle, bounce
-      st.v = Math.max(st.v, 3.2 + st.combo * 0.55);
+      st.v = Math.max(st.v, 3.0 + st.combo * 0.4);
       if (st.h === 0) st.squash.kick(-4);
       sfx.play('boing', st.combo);
       burst('sparkle', zef.pos.clone().setY(zef.pos.y + 0.6), { count: 8 });

@@ -233,6 +233,7 @@ export function Pip({ onTap }: { onTap?: (e: ThreeEvent<PointerEvent>) => void }
   const smile = useRef<THREE.Mesh>(null!);
   const open = useRef<THREE.Group>(null!);
   const hitRef = useRef<THREE.Mesh>(null!);
+  const bellyLines = useRef<THREE.Group>(null!);
 
   const st = useRef({
     hopPhase: 0,
@@ -500,6 +501,8 @@ export function Pip({ onTap }: { onTap?: (e: ThreeEvent<PointerEvent>) => void }
     smile.current.visible = !mouthOpen;
     open.current.visible = mouthOpen;
     hitRef.current.scale.setScalar(1);
+    // thin belly lines read as stray strokes when Pip is big and hugging
+    bellyLines.current.visible = s.scale < 1.3;
   });
 
   return (
@@ -524,11 +527,13 @@ export function Pip({ onTap }: { onTap?: (e: ThreeEvent<PointerEvent>) => void }
             <mesh material={m.belly} position={[0, 0.2, 0.105]} scale={[0.78, 0.92, 0.5]}>
               <sphereGeometry args={[0.18, 20, 16]} />
             </mesh>
+            <group ref={bellyLines}>
             {[0.13, 0.2, 0.27].map((y) => (
               <mesh key={y} material={m.bellyLine} position={[0, y, 0.17 - Math.abs(y - 0.2) * 0.3]} rotation={[Math.PI / 2 - 0.15, 0, 0]} scale={[1, 1, 0.45]}>
                 <torusGeometry args={[0.11 - Math.abs(y - 0.2) * 0.45, 0.004, 4, 16, Math.PI]} />
               </mesh>
             ))}
+            </group>
             {/* back spikes */}
             {[
               [0.43, -0.05, -0.3],

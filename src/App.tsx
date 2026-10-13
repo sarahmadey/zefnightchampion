@@ -10,7 +10,7 @@ import { HugNook } from './scenes/HugNook';
 import { CastleInterior } from './scenes/CastleInterior';
 import { CameraRig } from './game/CameraRig';
 import { Particles, burst } from './three/Particles';
-import { cam, clock, pip, pipReact, frameDt } from './game/actors';
+import { cam, clock, pip, pipReact, frameDt, zef, zefPlay } from './game/actors';
 import { currentJourney, useGame, useSave } from './state/store';
 import { placeAtStop, setFocus } from './game/world';
 import { checkProgress, notifyDoorsOpened, enterCastleFromDoors } from './game/director';
@@ -104,8 +104,34 @@ function Scenes() {
   );
 }
 
+function CharView({ pose }: { pose: string }) {
+  useEffect(() => {
+    zef.scripted = true;
+    zef.pos.set(0, 0, 0);
+    zef.heading = 0.35;
+    zef.expression = pose === 'hugged' ? 'cozy' : 'smile';
+    if (pose !== 'idle') zefPlay(pose as never, 999, true);
+    pip.mode = 'scripted';
+    pip.pos.set(0.9, 0, -0.4);
+    pip.heading = -0.4;
+    cam.mode = 'shot';
+    cam.pos.set(0.3, 0.95, 1.9);
+    cam.target.set(0.2, 0.6, 0);
+    cam.fitWidth = 0;
+    cam.snap = true;
+  }, [pose]);
+  return (
+    <>
+      <color attach="background" args={['#ffe7d6']} />
+      <hemisphereLight args={['#fff3ea', '#c4a3d9', 1.4]} />
+      <directionalLight position={[2, 4, 3]} intensity={2.2} />
+    </>
+  );
+}
+
 export function App() {
   useEffect(() => installDebug(), []);
+  const charView = new URLSearchParams(location.search).get('charview');
   return (
     <div className="game">
       <Canvas
@@ -120,7 +146,7 @@ export function App() {
           <Boot />
           <DirectorHooks />
           <CameraRig />
-          <Scenes />
+          {charView ? <CharView pose={charView} /> : <Scenes />}
           <Zef />
           <Pip
             onTap={(e) => {
