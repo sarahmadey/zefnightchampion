@@ -1,18 +1,22 @@
-// Tiny event bus so cutscenes can cue effects inside scene components.
+// Tiny event bus so events can cue effects inside scene components.
 
 type Handler = (...args: never[]) => void;
 
 const handlers = new Map<string, Set<Handler>>();
 
 export type BusEvent =
-  | 'lightWake'
-  | 'stopWake'
-  | 'castleWake'
-  | 'castleDoorsOpen'
-  | 'sleepyLight'
-  | 'interact'
-  | 'fireworks'
-  | 'balloonGo';
+  /** a dino's foot came down hard (actor, foot) */
+  | 'stomp'
+  /** a big roar (actor, strength 0..1) */
+  | 'roar'
+  /** the egg wobbled or cracked (stage) */
+  | 'egg'
+  /** the chest at the end of the land opened */
+  | 'chest'
+  /** a star flew to the board (space index) */
+  | 'star'
+  /** the high five landed */
+  | 'slap';
 
 export const bus = {
   on<A extends unknown[]>(evt: BusEvent, fn: (...args: A) => void): () => void {

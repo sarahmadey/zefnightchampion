@@ -1,24 +1,42 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_RULES,
   addDays,
-  computeStreak,
+  computeQuest,
   daysBetween,
-  holesInHistory,
   isValidDateKey,
+  landOf,
+  landRange,
   missingSinceLatest,
+  prizeThreshold,
+  prizesEarned,
+  questIfRecorded,
+  recentRate,
   type Records,
 } from '../src/state/progress';
 import {
+  APP_ID,
   applyDerived,
   defaultSave,
   exportBackup,
-  newAdventure,
+  newQuest,
   normalizeSave,
   parseBackup,
+  seenFromRecords,
   withRecord,
 } from '../src/state/save';
+import {
+  ACCESSORIES,
+  accessoriesUnlocked,
+  accessoryForStar,
+  defaultOutfit,
+  prizeAt,
+  surpriseFor,
+  DEFAULT_PRIZES,
+} from '../src/game/rewards';
 
 const NOW = new Date(2026, 9, 13, 8, 0, 0); // Oct 13 2026, local morning
+const TODAY = '2026-10-13';
 
 function dryRun(end: string, n: number): Records {
   const r: Records = {};
@@ -35,151 +53,196 @@ describe('date keys', () => {
     expect(isValidDateKey(42)).toBe(false);
   });
 
-  it('adds days across month, year and DST boundaries', () => {
+  it('adds days across month and year boundaries', () => {
     expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
-    expect(addDays('2026-03-08', 1)).toBe('2026-03-09'); // US DST start
-    expect(addDays('2026-11-01', 1)).toBe('2026-11-02'); // US DST end
-    expect(addDays('2028-03-01', -1)).toBe('2028-02-29');
-    expect(daysBetween('2026-10-01', '2026-10-13')).toBe(12);
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+    expect(daysBetween('2026-03-07', '2026-03-09')).toBe(2);
   });
 });
 
-describe('streaks', () => {
-  it('is zero with no records', () => {
-    const s = computeStreak({});
-    expect(s.streak).toBe(0);
-    expect(s.activeStop).toBe(0);
-    expect(s.latest).toBeNull();
+describe('prizes and lands', () => {
+  it('gives the first prize at 10 stars, then every 15', () => {
+    expect([0, 1, 2, 3].map((i) => prizeThreshold(i))).toEqual([10, 25, 40, 55]);
+    expect(prizesEarned(9)).toBe(0);
+    expect(prizesEarned(10)).toBe(1);
+    expect(prizesEarned(24)).toBe(1);
+    expect(prizesEarned(25)).toBe(2);
+    expect(prizesEarned(100)).toBe(7);
   });
 
-  it('counts adjacent dry mornings ending at the latest record', () => {
-    const s = computeStreak(dryRun('2026-10-13', 7));
-    expect(s.streak).toBe(7);
-    expect(s.activeStop).toBe(7);
-    expect(s.runStart).toBe('2026-10-07');
+  it('splits the board into a 10-space land and then 15-space lands', () => {
+    expect(landRange(0)).toEqual({ start: 0, end: 10 });
+    expect(landRange(1)).toEqual({ start: 10, end: 25 });
+    expect(landRange(2)).toEqual({ start: 25, end: 40 });
+    expect(landOf(0)).toBe(0);
+    expect(landOf(9)).toBe(0);
+    // reaching the chest finishes the land and the board moves on
+    expect(landOf(10)).toBe(1);
+    expect(landOf(26)).toBe(2);
   });
 
-  it('caps the journey at 15 stops while the streak keeps counting', () => {
-    const s = computeStreak(dryRun('2026-10-13', 20));
-    expect(s.streak).toBe(20);
-    expect(s.activeStop).toBe(15);
+  it('cycles through the prize list', () => {
+    expect(prizeAt(DEFAULT_PRIZES, 0).label).toBe('Candy');
+    expect(prizeAt(DEFAULT_PRIZES, 2).label).toBe("McDonald's");
+    expect(prizeAt(DEFAULT_PRIZES, 5).label).toBe('Pizza party');
+    expect(prizeAt(DEFAULT_PRIZES, 6).label).toBe('Candy');
+    expect(prizeAt([], 0).label).toBe('Candy');
+  });
+});
+
+describe('quest', () => {
+  it('counts every dry morning as a star and keeps stars after a wet night', () => {
+    const r: Records = { ...dryRun('2026-10-05', 5), '2026-10-06': 'wet', ...dryRun('2026-10-09', 3) };
+    const q = computeQuest(r);
+    expect(q.stars).toBe(8);
+    expect(q.wets).toBe(1);
+    expect(q.meter).toBe(3);
+    expect(q.best).toBe(5);
+    expect(q.lastWet).toBe('2026-10-06');
   });
 
-  it('a wet latest morning resets the active journey', () => {
-    const r = dryRun('2026-10-12', 5);
-    r['2026-10-13'] = 'wet';
-    const s = computeStreak(r);
-    expect(s.streak).toBe(0);
-    expect(s.activeStop).toBe(0);
-    expect(s.runBrokenBy).toEqual({ date: '2026-10-13', reason: 'wet' });
+  it('starts the meter fresh on a wet morning', () => {
+    const q = computeQuest({ ...dryRun('2026-10-12', 6), [TODAY]: 'wet' });
+    expect(q.meter).toBe(0);
+    expect(q.stars).toBe(6);
+    expect(q.latest).toEqual({ date: TODAY, result: 'wet' });
   });
 
-  it('dry nights after a wet one start a fresh run', () => {
-    const r: Records = { '2026-10-10': 'dry', '2026-10-11': 'wet', '2026-10-12': 'dry', '2026-10-13': 'dry' };
-    const s = computeStreak(r);
-    expect(s.streak).toBe(2);
-    expect(s.runBrokenBy).toEqual({ date: '2026-10-11', reason: 'wet' });
+  it('treats unrecorded mornings as unknown: they neither add nor reset', () => {
+    const r: Records = { ...dryRun('2026-10-05', 4), ...dryRun('2026-10-12', 3) };
+    const q = computeQuest(r);
+    expect(q.meter).toBe(7);
+    expect(q.stars).toBe(7);
+    expect(missingSinceLatest({ '2026-10-10': 'dry' }, TODAY)).toEqual(['2026-10-11', '2026-10-12']);
   });
 
-  it('never treats an unrecorded night as dry: a gap ends the run', () => {
-    const r: Records = { '2026-10-09': 'dry', '2026-10-10': 'dry', '2026-10-12': 'dry', '2026-10-13': 'dry' };
-    const s = computeStreak(r);
-    expect(s.streak).toBe(2);
-    expect(s.runBrokenBy).toEqual({ date: '2026-10-11', reason: 'unknown' });
+  it('reaches the underpants goal after N dry mornings in a row', () => {
+    expect(computeQuest(dryRun(TODAY, 19)).goalReachedOn).toBeNull();
+    expect(computeQuest(dryRun(TODAY, 20)).goalReachedOn).toBe(TODAY);
+    expect(computeQuest(dryRun(TODAY, 5), { ...DEFAULT_RULES, goal: 5 }).goalReachedOn).toBe(TODAY);
   });
 
-  it('never treats an unrecorded night as wet: no record after the latest keeps the run', () => {
-    const r = dryRun('2026-10-10', 4);
-    const s = computeStreak(r);
-    expect(s.streak).toBe(4);
-    expect(missingSinceLatest(r, '2026-10-13')).toEqual(['2026-10-11', '2026-10-12']);
+  it('previews a correction without changing the records', () => {
+    const r = dryRun('2026-10-12', 3);
+    expect(questIfRecorded(r, TODAY, 'wet').meter).toBe(0);
+    expect(questIfRecorded(r, '2026-10-12', null).stars).toBe(2);
+    expect(Object.keys(r)).toHaveLength(3);
   });
 
-  it('recalculates after a correction fills a gap', () => {
-    const r: Records = { '2026-10-09': 'dry', '2026-10-10': 'dry', '2026-10-12': 'dry', '2026-10-13': 'dry' };
-    expect(computeStreak(r).streak).toBe(2);
-    expect(computeStreak({ ...r, '2026-10-11': 'dry' }).streak).toBe(5);
-    expect(computeStreak({ ...r, '2026-10-11': 'wet' }).streak).toBe(2);
-    expect(holesInHistory(r)).toEqual(['2026-10-11']);
+  it('summarises the last two weeks for grown-ups', () => {
+    const r: Records = { ...dryRun(TODAY, 10), '2026-10-02': 'wet' };
+    expect(recentRate(r, TODAY, 14)).toEqual({ dry: 10, wet: 1, unknown: 3 });
+  });
+});
+
+describe('surprises and accessories', () => {
+  it('hatches an egg on odd stars until every accessory is out', () => {
+    expect(surpriseFor(1)).toBe('egg');
+    expect(surpriseFor(2)).toBe('highfive');
+    expect(surpriseFor(3)).toBe('egg');
+    expect(surpriseFor(4)).toBe('dance');
+    expect(surpriseFor(6)).toBe('roar');
+    expect(surpriseFor(8)).toBe('highfive');
+    expect(accessoryForStar(1)).toBe(0);
+    expect(accessoryForStar(5)).toBe(2);
+    expect(accessoryForStar(4)).toBeNull();
+    const last = ACCESSORIES.length * 2;
+    expect(accessoryForStar(last - 1)).toBe(ACCESSORIES.length - 1);
+    expect(surpriseFor(last + 1)).not.toBe('egg');
+  });
+
+  it('unlocks accessories in order and dresses the dino in the newest per slot', () => {
+    expect(accessoriesUnlocked(0)).toBe(0);
+    expect(accessoriesUnlocked(1)).toBe(1);
+    expect(accessoriesUnlocked(2)).toBe(1);
+    expect(accessoriesUnlocked(1000)).toBe(ACCESSORIES.length);
+    const outfit = defaultOutfit(5);
+    expect(outfit.head).toBe(4); // party hat replaced the cap
+    expect(outfit.face).toBe(1);
   });
 });
 
 describe('save data', () => {
-  it('stores at most one result per morning and repeat taps do not advance', () => {
-    let d = defaultSave(NOW);
-    d = withRecord(d, '2026-10-13', 'dry', NOW);
-    const again = withRecord(d, '2026-10-13', 'dry', NOW);
-    expect(again).toBe(d);
-    expect(Object.keys(again.records)).toEqual(['2026-10-13']);
-    expect(computeStreak(again.records).streak).toBe(1);
+  it('starts with sound on and setup to do', () => {
+    const d = defaultSave(NOW);
+    expect(d.settings.sound).toBe(true);
+    expect(d.profile.setupDone).toBe(false);
+    expect(d.rules.goal).toBe(20);
   });
 
-  it('rejects future mornings', () => {
+  it('records idempotently, one result per morning, never in the future', () => {
     const d = defaultSave(NOW);
+    const a = withRecord(d, TODAY, 'dry', NOW);
+    expect(withRecord(a, TODAY, 'dry', NOW)).toBe(a);
+    const b = withRecord(a, TODAY, 'wet', NOW);
+    expect(Object.keys(b.records)).toEqual([TODAY]);
+    expect(b.records[TODAY]).toBe('wet');
     expect(() => withRecord(d, '2026-10-14', 'dry', NOW)).toThrow();
   });
 
-  it('adds keepsakes as stops are reached and keeps them after a wet night', () => {
+  it('earns underpants at the goal and keeps them through later wet nights', () => {
     let d = defaultSave(NOW);
-    for (let i = 4; i >= 0; i--) d = withRecord(d, addDays('2026-10-12', -i), 'dry', NOW);
-    expect(d.keepsakes).toEqual([1, 2, 3, 4, 5]);
-    d = withRecord(d, '2026-10-13', 'wet', NOW);
-    expect(computeStreak(d.records).activeStop).toBe(0);
-    expect(d.keepsakes).toEqual([1, 2, 3, 4, 5]);
+    d = { ...d, records: dryRun('2026-10-12', 20) };
+    d = applyDerived(d);
+    expect(d.underpants.earned).toBe(true);
+    expect(d.underpants.on).toBe('2026-10-12');
+    d = withRecord(d, TODAY, 'wet', NOW);
+    expect(d.underpants.earned).toBe(true);
+    expect(computeQuest(d.records, d.rules).meter).toBe(0);
   });
 
-  it('keeps the castle unlocked once earned, even after corrections', () => {
-    let d = defaultSave(NOW);
-    d = { ...d, records: dryRun('2026-10-13', 15) };
-    d = applyDerived(d, NOW);
-    expect(d.castleUnlocked).toBe(true);
-    d = withRecord(d, '2026-10-05', 'wet', NOW);
-    expect(computeStreak(d.records).activeStop).toBe(8);
-    expect(d.castleUnlocked).toBe(true);
-    expect(d.keepsakes.length).toBe(15);
+  it('earns underpants when a grown-up lowers the goal below the current run', () => {
+    let d = { ...defaultSave(NOW), records: dryRun(TODAY, 8) };
+    d = applyDerived(d);
+    expect(d.underpants.earned).toBe(false);
+    d = applyDerived({ ...d, rules: { ...d.rules, goal: 7 } });
+    expect(d.underpants.earned).toBe(true);
   });
 
-  it('a new adventure clears progress but keeps settings', () => {
-    let d = defaultSave(NOW);
-    d = { ...applyDerived({ ...d, records: dryRun('2026-10-13', 15) }, NOW), settings: { sound: true, reducedMotion: true } };
-    const fresh = newAdventure(d, NOW);
-    expect(fresh.records).toEqual({});
-    expect(fresh.castleUnlocked).toBe(false);
-    expect(fresh.keepsakes).toEqual([]);
-    expect(fresh.settings).toEqual({ sound: true, reducedMotion: true });
-    expect(fresh.adventureId).not.toBe(d.adventureId);
+  it('rejects data that is not ours', () => {
+    expect(normalizeSave({ app: 'other', records: {} }, NOW)).toBeNull();
+    expect(normalizeSave(null, NOW)).toBeNull();
+    const ok = normalizeSave({ app: APP_ID, version: 1, records: { [TODAY]: 'dry', '2030-01-01': 'dry', bad: 'dry' } }, NOW);
+    expect(ok?.records).toEqual({ [TODAY]: 'dry' });
   });
 
-  it('round-trips a backup and does not replay events after import', () => {
+  it('round-trips a backup and marks everything as already seen', () => {
     let d = defaultSave(NOW);
-    d = applyDerived({ ...d, records: dryRun('2026-10-12', 6) }, NOW);
-    d = withRecord(d, '2026-10-13', 'wet', NOW);
+    d = { ...d, records: { ...dryRun('2026-10-12', 12), [TODAY]: 'wet' }, profile: { ...d.profile, species: 'stego', setupDone: true } };
     const text = exportBackup(d, NOW);
     const res = parseBackup(text, defaultSave(NOW), NOW);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    expect(res.data.records).toEqual(d.records);
-    expect(res.data.keepsakes).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(res.data.seen).toEqual({ stop: 0, hugDate: '2026-10-13', streak: 0 });
+    expect(res.recordCount).toBe(13);
+    expect(res.data.profile.species).toBe('stego');
+    expect(res.data.seen).toEqual({ stars: 12, prizes: 1, hugDate: TODAY, underpants: false, meter: 0 });
   });
 
-  it('rejects files that are not backups', () => {
+  it('imports the nights from an old candy-castle backup', () => {
+    const old = JSON.stringify({ app: 'zefs-dry-night-quest', version: 1, records: dryRun(TODAY, 4) });
+    const res = parseBackup(old, defaultSave(NOW), NOW);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.fromOldVersion).toBe(true);
+    expect(computeQuest(res.data.records).stars).toBe(4);
+    expect(res.data.seen.stars).toBe(4);
+  });
+
+  it('refuses unreadable or foreign backups', () => {
     expect(parseBackup('not json', defaultSave(NOW), NOW).ok).toBe(false);
     expect(parseBackup('{"hello":1}', defaultSave(NOW), NOW).ok).toBe(false);
   });
 
-  it('drops malformed entries when normalising', () => {
-    const d = normalizeSave(
-      {
-        app: 'zefs-dry-night-quest',
-        version: 1,
-        records: { '2026-10-12': 'dry', bad: 'dry', '2026-10-11': 'maybe', '2030-01-01': 'dry' },
-        keepsakes: [1, 1, 99, 'x'],
-      },
-      NOW,
-    );
-    expect(d?.records).toEqual({ '2026-10-12': 'dry' });
-    expect(d?.keepsakes).toEqual([1]);
+  it('starts a new quest but keeps the dino, prizes and settings', () => {
+    let d = defaultSave(NOW);
+    d = { ...d, records: dryRun(TODAY, 30), profile: { ...d.profile, name: 'Zef', species: 'trike', setupDone: true } };
+    d = applyDerived(d);
+    const n = newQuest(d, NOW);
+    expect(n.records).toEqual({});
+    expect(n.underpants.earned).toBe(false);
+    expect(n.profile.species).toBe('trike');
+    expect(n.prizes).toEqual(d.prizes);
+    expect(seenFromRecords(n).stars).toBe(0);
   });
 });

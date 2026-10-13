@@ -1,137 +1,106 @@
-// Mutable per-frame state for Zef, Pip and the camera. React components read
-// these every frame; game logic writes them. Keeping high-frequency data out
-// of React state keeps the game smooth.
+// Mutable per-frame state for Zef's dino, Coach Rex and the camera. React
+// components read these every frame; game logic writes them. Keeping
+// high-frequency data out of React state keeps the game smooth.
 
 import * as THREE from 'three';
 
-export type ZefAction =
+export type DinoAction =
   | 'none'
-  | 'point'
-  | 'jump'
-  | 'celebrate'
-  | 'wave'
-  | 'knock'
-  | 'cheer'
-  | 'lookUp'
-  | 'stretch'
-  | 'sit'
+  | 'hop'
+  | 'walk'
+  | 'wiggle'
+  | 'spin'
+  | 'stomp'
+  | 'twist'
+  | 'roar'
+  | 'highfive'
+  | 'hug'
   | 'hugged'
-  | 'swing'
-  | 'ride'
-  | 'clap'
-  | 'shrug'
-  | 'push';
+  | 'cheer'
+  | 'wave'
+  | 'point'
+  | 'stretch'
+  | 'nod'
+  | 'show'
+  | 'giggle'
+  | 'bow'
+  | 'sit';
 
-export type Expression = 'smile' | 'happy' | 'wow' | 'calm' | 'cozy' | 'sleepy';
-
-export interface NavRoute {
-  mode: 'route';
-  targetS: number;
-  targetLat: number;
-  onArrive?: () => void;
-}
-
-export interface NavFree {
-  mode: 'free';
-  points: THREE.Vector3[];
-  onArrive?: () => void;
-}
+export type Expression = 'smile' | 'happy' | 'wow' | 'calm' | 'sleepy' | 'roar';
 
 export interface ActionState {
-  name: ZefAction;
+  name: DinoAction;
   t: number;
   dur: number;
   /** loop until replaced */
   loop: boolean;
 }
 
-export const zef = {
-  pos: new THREE.Vector3(0, 0, 4),
-  heading: Math.PI,
-  speed: 0,
-  s: 0,
-  lateral: 0,
-  nav: null as NavRoute | NavFree | null,
-  action: { name: 'none', t: 0, dur: 0, loop: false } as ActionState,
-  look: null as THREE.Vector3 | null,
-  expression: 'smile' as Expression,
-  /** extra height (jumps, bounces) */
-  air: 0,
+export interface DinoActor {
+  pos: THREE.Vector3;
+  heading: number;
+  /** extra height (hops, jumps) */
+  air: number;
   /** squash-and-stretch: 1 = neutral, <1 squashed, >1 stretched */
-  stretch: 1,
-  /** when set, game code drives position each frame (bounce on cloud, boat ride…) */
-  scripted: false,
-  visible: true,
-  runFactor: 0,
-  /** hair/coat flutter from the windmill breeze */
-  breeze: 0,
-  /** wearing the castle crown */
-  crown: false,
-};
-
-export type PipMode = 'follow' | 'scripted' | 'hug' | 'stay';
-export type PipReaction =
-  | 'none'
-  | 'giggle'
-  | 'spin'
-  | 'flip'
-  | 'tailchase'
-  | 'puff'
-  | 'dance'
-  | 'surprised'
-  | 'love'
-  | 'cheer'
-  | 'yawn'
-  | 'wave'
-  | 'nod';
-
-export const pip = {
-  pos: new THREE.Vector3(-0.8, 0, 5),
-  heading: Math.PI,
-  speed: 0,
-  mode: 'follow' as PipMode,
-  reaction: { name: 'none' as PipReaction, t: 0, dur: 0 },
-  look: null as THREE.Vector3 | null,
-  /** 0 grounded, 1 fully airborne fluttering */
-  fly: 0,
-  air: 0,
-  hop: 0,
-  scale: 1,
-  targetScale: 1,
-  /** posture for scripted moments */
-  pose: 'stand' as 'stand' | 'sit' | 'slide' | 'hug' | 'ride' | 'sleep',
-  visible: true,
-  glow: 0,
-  breeze: 0,
-};
-
-export function zefPlay(name: ZefAction, dur = 1.2, loop = false) {
-  zef.action = { name, t: 0, dur, loop };
+  stretch: number;
+  action: ActionState;
+  expression: Expression;
+  look: THREE.Vector3 | null;
+  /** 0..1 mouth opening while talking (driven by the voice level) */
+  talk: number;
+  /** walking cadence 0..1 */
+  walk: number;
+  visible: boolean;
+  /** extra uniform scale (pop-in, growing) */
+  scale: number;
+  /** a soft glow while something special happens */
+  glow: number;
+  /** world position of the high-five hand (or front foot), updated by the rig */
+  hand: THREE.Vector3;
 }
 
-export function pipReact(name: PipReaction, dur = 1.4) {
-  pip.reaction = { name, t: 0, dur };
+function makeActor(x: number, z: number): DinoActor {
+  return {
+    pos: new THREE.Vector3(x, 0, z),
+    heading: Math.PI,
+    air: 0,
+    stretch: 1,
+    action: { name: 'none', t: 0, dur: 0, loop: false },
+    expression: 'smile',
+    look: null,
+    talk: 0,
+    walk: 0,
+    visible: true,
+    scale: 1,
+    glow: 0,
+    hand: new THREE.Vector3(),
+  };
+}
+
+/** Zef's own dino. */
+export const hero = makeActor(0, 0);
+/** Coach Rex, the big friendly T. rex who talks, high-fives and hugs. */
+export const coach = makeActor(1.6, 0);
+
+export function play(actor: DinoActor, name: DinoAction, dur = 1.2, loop = false) {
+  actor.action = { name, t: 0, dur, loop };
 }
 
 // ------------------------------------------------------------------ camera
 
-export type CamMode = 'follow' | 'focus' | 'shot' | 'room';
+export type CamMode = 'board' | 'shot';
 
 export const cam = {
-  mode: 'follow' as CamMode,
+  mode: 'board' as CamMode,
   /** goal position/target the rig eases toward */
-  pos: new THREE.Vector3(0, 4, 14),
-  target: new THREE.Vector3(0, 1, 0),
+  pos: new THREE.Vector3(0, 6, 12),
+  target: new THREE.Vector3(0, 0.6, 0),
   /** smoothing speed (higher = snappier) */
-  lambda: 2.6,
-  /** subject width that should fit horizontally (focus shots on narrow screens) */
+  lambda: 2.4,
+  /** subject width that must fit horizontally (narrow phone screens pull back) */
   fitWidth: 0,
-  /** the surprise being framed; portrait screens centre on it */
-  focusObject: null as THREE.Vector3 | null,
   /** jump directly to goal on next frame */
   snap: false,
-  /** extra field-of-view multiplier for dramatic shots */
-  fovBoost: 1,
   shake: 0,
 };
 
@@ -146,7 +115,7 @@ export class Cancelled extends Error {
   }
 }
 
-/** Time that only advances with rendered frames, so cutscenes pause with the tab. */
+/** Time that only advances with rendered frames, so events pause with the tab. */
 export class FrameClock {
   time = 0;
   private waiters: Waiter[] = [];

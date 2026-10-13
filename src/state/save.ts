@@ -1,41 +1,86 @@
-// Saved game data, local persistence, and backup import/export.
+// Saved quest data, local persistence, and backup import/export.
 
 import {
-  STOP_COUNT,
-  computeStreak,
+  DEFAULT_RULES,
+  GOAL_MAX,
+  GOAL_MIN,
+  computeQuest,
   isValidDateKey,
   todayKey,
   type DateKey,
   type NightResult,
+  type QuestRules,
   type Records,
 } from './progress';
+import {
+  ACCESSORIES,
+  DEFAULT_PRIZES,
+  DINO_COLORS,
+  PRIZE_ICONS,
+  SPECIES,
+  UNDERPANTS,
+  type Prize,
+  type PrizeIcon,
+  type Slot,
+  type Species,
+} from '../game/rewards';
 
-export const APP_ID = 'zefs-dry-night-quest';
-export const STORAGE_KEY = 'zefs-dry-night-quest:v1';
-const BACKUP_KEY = 'zefs-dry-night-quest:v1:previous';
+export const APP_ID = 'zefs-dino-underpants-quest';
+export const STORAGE_KEY = 'zefs-dino-underpants-quest:v1';
+const BACKUP_KEY = 'zefs-dino-underpants-quest:v1:previous';
+/** Backups from the earlier candy-castle version still carry their nights over. */
+const OLD_APP_ID = 'zefs-dry-night-quest';
 
 export interface Settings {
   sound: boolean;
+  music: boolean;
   reducedMotion: boolean;
 }
 
-/** What the child has already been shown, so refreshes never replay or double-advance. */
+export interface Profile {
+  name: string;
+  species: Species;
+  color: number;
+  /** The first-time setup (name, dino, mission) has been done. */
+  setupDone: boolean;
+}
+
+/** What the child has already been shown, so refreshes never replay or double-count. */
 export interface Seen {
-  stop: number;
+  /** Board position (stars) last celebrated. */
+  stars: number;
+  /** Prize chests already opened. */
+  prizes: number;
+  /** The wet morning whose hug has played. */
   hugDate: DateKey | null;
-  streak: number;
+  /** The underpants store visit has played. */
+  underpants: boolean;
+  /** Meter value last shown, so changes can animate. */
+  meter: number;
+}
+
+export interface UnderpantsState {
+  earned: boolean;
+  on: DateKey | null;
+  /** The design picked in the store. */
+  pick: number | null;
 }
 
 export interface SaveData {
   app: typeof APP_ID;
   version: 1;
-  adventureId: string;
+  questId: string;
   createdAt: string;
   updatedAt: string;
   records: Records;
-  keepsakes: number[];
-  castleUnlocked: boolean;
-  castleUnlockedAt: string | null;
+  rules: QuestRules;
+  prizes: Prize[];
+  /** Prize numbers the grown-ups have handed over. */
+  prizesGiven: number[];
+  underpants: UnderpantsState;
+  profile: Profile;
+  /** Accessory chosen per slot (-1 = nothing), overriding the default outfit. */
+  outfit: Partial<Record<Slot, number>>;
   seen: Seen;
   settings: Settings;
 }
@@ -46,7 +91,7 @@ function newId(): string {
   } catch {
     /* fall through */
   }
-  return `adv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `quest-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function prefersReducedMotion(): boolean {
@@ -62,15 +107,18 @@ export function defaultSave(now: Date = new Date()): SaveData {
   return {
     app: APP_ID,
     version: 1,
-    adventureId: newId(),
+    questId: newId(),
     createdAt: iso,
     updatedAt: iso,
     records: {},
-    keepsakes: [],
-    castleUnlocked: false,
-    castleUnlockedAt: null,
-    seen: { stop: 0, hugDate: null, streak: 0 },
-    settings: { sound: false, reducedMotion: prefersReducedMotion() },
+    rules: { ...DEFAULT_RULES },
+    prizes: DEFAULT_PRIZES.map((p) => ({ ...p })),
+    prizesGiven: [],
+    underpants: { earned: false, on: null, pick: null },
+    profile: { name: 'Zef', species: 'trex', color: 0, setupDone: false },
+    outfit: {},
+    seen: { stars: 0, prizes: 0, hugDate: null, underpants: false, meter: 0 },
+    settings: { sound: true, music: true, reducedMotion: prefersReducedMotion() },
   };
 }
 
@@ -85,62 +133,103 @@ function cleanRecords(input: unknown, today: DateKey): { records: Records; dropp
   return { records, dropped };
 }
 
-function cleanKeepsakes(input: unknown): number[] {
-  if (!Array.isArray(input)) return [];
-  const set = new Set<number>();
-  for (const v of input) {
-    if (Number.isInteger(v) && v >= 1 && v <= STOP_COUNT) set.add(v);
+function int(v: unknown, lo: number, hi: number, fallback: number): number {
+  return Number.isInteger(v) ? Math.max(lo, Math.min(hi, v as number)) : fallback;
+}
+
+export function clampGoal(n: number): number {
+  return Math.max(GOAL_MIN, Math.min(GOAL_MAX, Math.round(n)));
+}
+
+function cleanPrizes(input: unknown): Prize[] {
+  if (!Array.isArray(input)) return DEFAULT_PRIZES.map((p) => ({ ...p }));
+  const icons = new Set(PRIZE_ICONS.map((p) => p.id));
+  const out: Prize[] = [];
+  for (const p of input.slice(0, 40)) {
+    if (!p || typeof p !== 'object') continue;
+    const label = typeof p.label === 'string' ? p.label.trim().slice(0, 40) : '';
+    const icon = icons.has(p.icon) ? (p.icon as PrizeIcon) : 'gift';
+    if (label) out.push({ label, icon });
   }
-  return [...set].sort((a, b) => a - b);
+  return out.length ? out : DEFAULT_PRIZES.map((p) => ({ ...p }));
 }
 
-/** Recompute everything that follows from the records: keepsakes and the castle. */
-export function applyDerived(data: SaveData, now: Date = new Date()): SaveData {
-  const info = computeStreak(data.records);
-  const keep = new Set(data.keepsakes);
-  for (let i = 1; i <= info.activeStop; i++) keep.add(i);
-  const keepsakes = [...keep].sort((a, b) => a - b);
-  const reachedCastle = info.activeStop >= STOP_COUNT;
-  return {
-    ...data,
-    keepsakes,
-    castleUnlocked: data.castleUnlocked || reachedCastle,
-    castleUnlockedAt: data.castleUnlockedAt ?? (reachedCastle ? now.toISOString() : null),
-  };
+function cleanOutfit(input: unknown): Partial<Record<Slot, number>> {
+  const out: Partial<Record<Slot, number>> = {};
+  if (!input || typeof input !== 'object') return out;
+  for (const slot of ['head', 'face', 'neck', 'body', 'feet', 'prop'] as Slot[]) {
+    const v = (input as Record<string, unknown>)[slot];
+    if (v === -1) out[slot] = -1;
+    else if (Number.isInteger(v) && (v as number) >= 0 && (v as number) < ACCESSORIES.length && ACCESSORIES[v as number].slot === slot)
+      out[slot] = v as number;
+  }
+  return out;
 }
 
-/** Normalise anything that looks like save data. Returns null when it clearly isn't ours. */
+/** Recompute everything that follows from the records. Underpants, once earned, stay earned. */
+export function applyDerived(data: SaveData): SaveData {
+  const q = computeQuest(data.records, data.rules);
+  if (data.underpants.earned || !q.goalReachedOn) return data;
+  return { ...data, underpants: { ...data.underpants, earned: true, on: q.goalReachedOn } };
+}
+
+/** Normalise anything that looks like our save data. Returns null when it clearly isn't ours. */
 export function normalizeSave(raw: unknown, now: Date = new Date()): SaveData | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-  if (r.app !== undefined && r.app !== APP_ID) return null;
+  if (r.app !== APP_ID) return null;
   if (r.version !== undefined && r.version !== 1) return null;
   if (!('records' in r)) return null;
   const base = defaultSave(now);
   const { records } = cleanRecords(r.records, todayKey(now));
+  const rulesRaw = (r.rules ?? {}) as Record<string, unknown>;
   const seenRaw = (r.seen ?? {}) as Record<string, unknown>;
   const settingsRaw = (r.settings ?? {}) as Record<string, unknown>;
+  const profileRaw = (r.profile ?? {}) as Record<string, unknown>;
+  const upRaw = (r.underpants ?? {}) as Record<string, unknown>;
+  const species = SPECIES.some((s) => s.id === profileRaw.species) ? (profileRaw.species as Species) : base.profile.species;
   const data: SaveData = {
     ...base,
-    adventureId: typeof r.adventureId === 'string' && r.adventureId ? r.adventureId : base.adventureId,
+    questId: typeof r.questId === 'string' && r.questId ? r.questId : base.questId,
     createdAt: typeof r.createdAt === 'string' ? r.createdAt : base.createdAt,
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : base.updatedAt,
     records,
-    keepsakes: cleanKeepsakes(r.keepsakes),
-    castleUnlocked: r.castleUnlocked === true,
-    castleUnlockedAt: typeof r.castleUnlockedAt === 'string' ? r.castleUnlockedAt : null,
+    rules: {
+      goal: clampGoal(int(rulesRaw.goal, GOAL_MIN, GOAL_MAX, DEFAULT_RULES.goal)),
+      firstPrize: DEFAULT_RULES.firstPrize,
+      prizeEvery: DEFAULT_RULES.prizeEvery,
+    },
+    prizes: cleanPrizes(r.prizes),
+    prizesGiven: Array.isArray(r.prizesGiven)
+      ? [...new Set((r.prizesGiven as unknown[]).filter((v): v is number => Number.isInteger(v) && (v as number) >= 0))].sort((a, b) => a - b)
+      : [],
+    underpants: {
+      earned: upRaw.earned === true,
+      on: isValidDateKey(upRaw.on) ? (upRaw.on as string) : null,
+      pick: Number.isInteger(upRaw.pick) && (upRaw.pick as number) >= 0 && (upRaw.pick as number) < UNDERPANTS.length ? (upRaw.pick as number) : null,
+    },
+    profile: {
+      name: typeof profileRaw.name === 'string' && profileRaw.name.trim() ? profileRaw.name.trim().slice(0, 24) : base.profile.name,
+      species,
+      color: int(profileRaw.color, 0, DINO_COLORS.length - 1, 0),
+      setupDone: profileRaw.setupDone === true,
+    },
+    outfit: cleanOutfit(r.outfit),
     seen: {
-      stop: Number.isInteger(seenRaw.stop) ? Math.max(0, Math.min(STOP_COUNT, seenRaw.stop as number)) : 0,
+      stars: int(seenRaw.stars, 0, 100000, 0),
+      prizes: int(seenRaw.prizes, 0, 100000, 0),
       hugDate: isValidDateKey(seenRaw.hugDate) ? (seenRaw.hugDate as string) : null,
-      streak: Number.isInteger(seenRaw.streak) ? Math.max(0, seenRaw.streak as number) : 0,
+      underpants: seenRaw.underpants === true,
+      meter: int(seenRaw.meter, 0, 100000, 0),
     },
     settings: {
-      sound: settingsRaw.sound === true,
+      sound: settingsRaw.sound !== false,
+      music: settingsRaw.music !== false,
       reducedMotion:
         typeof settingsRaw.reducedMotion === 'boolean' ? settingsRaw.reducedMotion : base.settings.reducedMotion,
     },
   };
-  return applyDerived(data, now);
+  return applyDerived(data);
 }
 
 function storage(): Storage | null {
@@ -182,12 +271,7 @@ export function persistSave(data: SaveData): boolean {
 }
 
 /** Set (or clear, with null) the result for one morning. Idempotent per date. */
-export function withRecord(
-  data: SaveData,
-  date: DateKey,
-  result: NightResult | null,
-  now: Date = new Date(),
-): SaveData {
+export function withRecord(data: SaveData, date: DateKey, result: NightResult | null, now: Date = new Date()): SaveData {
   if (!isValidDateKey(date)) throw new Error('Invalid date');
   if (date > todayKey(now)) throw new Error('Cannot record a future morning');
   const current = data.records[date] ?? null;
@@ -195,22 +279,25 @@ export function withRecord(
   const records: Records = { ...data.records };
   if (result) records[date] = result;
   else delete records[date];
-  return applyDerived({ ...data, records, updatedAt: now.toISOString() }, now);
+  return applyDerived({ ...data, records, updatedAt: now.toISOString() });
 }
 
-/** Mark the current state as already shown (used after imports so nothing replays). */
+/** Mark everything in the records as already shown (after imports and goal changes, so nothing replays). */
 export function seenFromRecords(data: SaveData): Seen {
-  const info = computeStreak(data.records);
+  const q = computeQuest(data.records, data.rules);
   return {
-    stop: info.activeStop,
-    hugDate: info.latest && info.latest.result === 'wet' ? info.latest.date : data.seen.hugDate,
-    streak: info.streak,
+    stars: q.stars,
+    prizes: q.prizes,
+    hugDate: q.latest && q.latest.result === 'wet' ? q.latest.date : data.seen.hugDate,
+    underpants: data.underpants.earned,
+    meter: q.meter,
   };
 }
 
-export function newAdventure(data: SaveData, now: Date = new Date()): SaveData {
+/** A fresh quest that keeps who the child is and how the game sounds. */
+export function newQuest(data: SaveData, now: Date = new Date()): SaveData {
   const fresh = defaultSave(now);
-  return { ...fresh, settings: data.settings };
+  return { ...fresh, profile: { ...data.profile }, settings: data.settings, prizes: data.prizes, rules: data.rules };
 }
 
 export function exportBackup(data: SaveData, now: Date = new Date()): string {
@@ -220,7 +307,7 @@ export function exportBackup(data: SaveData, now: Date = new Date()): string {
 }
 
 export type ImportResult =
-  | { ok: true; data: SaveData; recordCount: number; dropped: number }
+  | { ok: true; data: SaveData; recordCount: number; dropped: number; fromOldVersion: boolean }
   | { ok: false; error: string };
 
 export function parseBackup(text: string, current: SaveData, now: Date = new Date()): ImportResult {
@@ -230,13 +317,19 @@ export function parseBackup(text: string, current: SaveData, now: Date = new Dat
   } catch {
     return { ok: false, error: "That file isn't a readable backup (it isn't valid JSON)." };
   }
-  if (!raw || typeof raw !== 'object' || (raw as Record<string, unknown>).app !== APP_ID) {
-    return { ok: false, error: "That file doesn't look like a Zef's Dry Night Quest backup." };
+  const app = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).app : undefined;
+  if (app === OLD_APP_ID) {
+    // the candy-castle version: bring its nights into a fresh quest
+    const { records, dropped } = cleanRecords((raw as Record<string, unknown>).records, todayKey(now));
+    const data = applyDerived({ ...newQuest(current, now), records, profile: { ...current.profile } });
+    data.seen = seenFromRecords(data);
+    return { ok: true, data, recordCount: Object.keys(records).length, dropped, fromOldVersion: true };
   }
+  if (app !== APP_ID) return { ok: false, error: "That file doesn't look like a Dino Underpants Quest backup." };
   const { dropped } = cleanRecords((raw as Record<string, unknown>).records, todayKey(now));
   const normalized = normalizeSave(raw, now);
   if (!normalized) return { ok: false, error: 'That backup is from an unknown version.' };
   const data: SaveData = { ...normalized, settings: current.settings };
   data.seen = seenFromRecords(data);
-  return { ok: true, data, recordCount: Object.keys(data.records).length, dropped };
+  return { ok: true, data, recordCount: Object.keys(data.records).length, dropped, fromOldVersion: false };
 }

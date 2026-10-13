@@ -10,12 +10,11 @@ async function run(label, viewer) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.addInitScript((viewer) => {
-    localStorage.setItem('zefs-dry-night-quest:welcomed', '1');
-    if (!viewer) return;
+        if (!viewer) return;
     window.__saves = [];
     const downloads = Object.freeze({
       save: async (req) => {
-        window.__saves.push({ filename: req.filename, length: String(req.data).length, ok: String(req.data).includes('zefs-dry-night-quest') });
+        window.__saves.push({ filename: req.filename, length: String(req.data).length, ok: String(req.data).includes('zefs-dino-underpants-quest') });
         if (viewer === 'decline') throw { code: 'declined', message: 'no' };
         return { status: 'saved' };
       },
@@ -24,8 +23,8 @@ async function run(label, viewer) {
   }, viewer);
   await page.goto(url, { waitUntil: 'load' });
   await page.waitForTimeout(4000);
-  await page.evaluate(() => window.__zef.recordRun(2, 0));
-  await page.evaluate(() => window.__zef.setParentOpen(true));
+  await page.evaluate(() => window.__dino.seed(2));
+  await page.evaluate(() => window.__dino.setParentOpen(true));
   await page.waitForTimeout(400);
   const [dl] = await Promise.all([
     page.waitForEvent('download', { timeout: 4000 }).catch(() => null),

@@ -1,16 +1,33 @@
-// Pure progress logic: local morning dates, streaks and gaps.
+// Pure progress logic: local morning dates, stars, the underpants meter and
+// prizes.
 //
 // A record is keyed by the *local date of the morning* after the night
-// (YYYY-MM-DD). At most one result is stored per morning. A streak counts
-// adjacent calendar mornings that were all recorded dry; a morning with no
-// record is "unknown" — it is never treated as dry or wet, but it does mean
-// the dry nights on either side of it are not consecutive.
+// (YYYY-MM-DD), at most one per morning.
+//
+// - Every dry morning is a star. Stars never go away: the board only ever
+//   moves forward.
+// - The underpants meter counts dry mornings since the most recent wet one.
+//   A wet morning starts it fresh. A morning with no record is unknown: it
+//   neither adds to the meter nor resets it.
+// - Prizes come from total stars: the first at `firstPrize` stars, then one
+//   every `prizeEvery` stars after that (10, 25, 40, ... by default).
 
 export type NightResult = 'dry' | 'wet';
 export type DateKey = string;
 export type Records = Record<DateKey, NightResult>;
 
-export const STOP_COUNT = 15;
+export interface QuestRules {
+  /** Dry nights in a row that earn underpants. */
+  goal: number;
+  /** Stars for the first prize. */
+  firstPrize: number;
+  /** Stars between later prizes. */
+  prizeEvery: number;
+}
+
+export const DEFAULT_RULES: QuestRules = { goal: 20, firstPrize: 10, prizeEvery: 15 };
+export const GOAL_MIN = 3;
+export const GOAL_MAX = 60;
 
 const KEY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -76,58 +93,112 @@ export function sortedKeys(records: Records): DateKey[] {
   return Object.keys(records).filter(isValidDateKey).sort(compareKeys);
 }
 
-export interface StreakInfo {
-  /** Consecutive dry mornings ending at the latest record (0 when it is wet). */
-  streak: number;
-  /** Journey position, 0 = cottage, 15 = castle. */
-  activeStop: number;
-  latest: { date: DateKey; result: NightResult } | null;
-  runStart: DateKey | null;
-  runEnd: DateKey | null;
-  /** Why the current run began: a wet night, an unknown night, or the very first record. */
-  runBrokenBy: { date: DateKey; reason: 'wet' | 'unknown' } | null;
+// ---------------------------------------------------------------- prizes
+
+/** Stars needed for prize number `i` (0-based). */
+export function prizeThreshold(i: number, rules: QuestRules = DEFAULT_RULES): number {
+  return rules.firstPrize + i * rules.prizeEvery;
 }
 
-export function computeStreak(records: Records): StreakInfo {
+/** How many prizes `stars` stars have earned. */
+export function prizesEarned(stars: number, rules: QuestRules = DEFAULT_RULES): number {
+  if (stars < rules.firstPrize) return 0;
+  return 1 + Math.floor((stars - rules.firstPrize) / rules.prizeEvery);
+}
+
+/**
+ * The board is split into lands, each ending at a prize chest. Land 0 holds
+ * spaces 1..firstPrize; land i holds the spaces after prize i-1 up to prize i.
+ * `start` is the space the land begins from (0 = the nest).
+ */
+export function landRange(land: number, rules: QuestRules = DEFAULT_RULES): { start: number; end: number } {
+  if (land <= 0) return { start: 0, end: rules.firstPrize };
+  return { start: prizeThreshold(land - 1, rules), end: prizeThreshold(land, rules) };
+}
+
+/** The land that board position `stars` is shown in (a finished land moves on to the next). */
+export function landOf(stars: number, rules: QuestRules = DEFAULT_RULES): number {
+  return prizesEarned(stars, rules);
+}
+
+// ---------------------------------------------------------------- quest
+
+export interface QuestState {
+  /** Every dry morning ever recorded. */
+  stars: number;
+  wets: number;
+  /** Dry mornings since the latest wet one (unknown mornings pause it). */
+  meter: number;
+  /** Longest meter run ever. */
+  best: number;
+  latest: { date: DateKey; result: NightResult } | null;
+  lastWet: DateKey | null;
+  /** First morning the meter reached the goal, if it ever has. */
+  goalReachedOn: DateKey | null;
+  prizes: number;
+  nextPrizeAt: number;
+}
+
+export function computeQuest(records: Records, rules: QuestRules = DEFAULT_RULES): QuestState {
+  let stars = 0;
+  let wets = 0;
+  let run = 0;
+  let best = 0;
+  let lastWet: DateKey | null = null;
+  let goalReachedOn: DateKey | null = null;
   const keys = sortedKeys(records);
-  if (keys.length === 0) {
-    return { streak: 0, activeStop: 0, latest: null, runStart: null, runEnd: null, runBrokenBy: null };
-  }
-  const lastKey = keys[keys.length - 1];
-  const latest = { date: lastKey, result: records[lastKey] };
-  if (latest.result === 'wet') {
-    return {
-      streak: 0,
-      activeStop: 0,
-      latest,
-      runStart: null,
-      runEnd: null,
-      runBrokenBy: { date: lastKey, reason: 'wet' },
-    };
-  }
-  let streak = 1;
-  let cursor = lastKey;
-  let runBrokenBy: StreakInfo['runBrokenBy'] = null;
-  for (;;) {
-    const prev = addDays(cursor, -1);
-    const r = records[prev];
-    if (r === 'dry') {
-      streak += 1;
-      cursor = prev;
-      continue;
+  for (const k of keys) {
+    if (records[k] === 'dry') {
+      stars++;
+      run++;
+      if (run > best) best = run;
+      if (run >= rules.goal && !goalReachedOn) goalReachedOn = k;
+    } else {
+      wets++;
+      run = 0;
+      lastWet = k;
     }
-    if (r === 'wet') runBrokenBy = { date: prev, reason: 'wet' };
-    else if (keys[0] < prev) runBrokenBy = { date: prev, reason: 'unknown' };
-    break;
   }
+  const last = keys[keys.length - 1];
+  const prizes = prizesEarned(stars, rules);
   return {
-    streak,
-    activeStop: Math.min(streak, STOP_COUNT),
-    latest,
-    runStart: cursor,
-    runEnd: lastKey,
-    runBrokenBy,
+    stars,
+    wets,
+    meter: run,
+    best,
+    latest: last ? { date: last, result: records[last] } : null,
+    lastWet,
+    goalReachedOn,
+    prizes,
+    nextPrizeAt: prizeThreshold(prizes, rules),
   };
+}
+
+/** What the quest would look like if `date` were recorded as `result` (parent previews). */
+export function questIfRecorded(
+  records: Records,
+  date: DateKey,
+  result: NightResult | null,
+  rules: QuestRules = DEFAULT_RULES,
+): QuestState {
+  const next: Records = { ...records };
+  if (result) next[date] = result;
+  else delete next[date];
+  return computeQuest(next, rules);
+}
+
+/** Recorded mornings in the `days` mornings ending today, for the grown-ups' stats. */
+export function recentRate(records: Records, today: DateKey, days = 14): { dry: number; wet: number; unknown: number } {
+  let dry = 0;
+  let wet = 0;
+  let unknown = 0;
+  for (let i = 0; i < days; i++) {
+    const r = records[addDays(today, -i)];
+    if (r === 'dry') dry++;
+    else if (r === 'wet') wet++;
+    else unknown++;
+  }
+  return { dry, wet, unknown };
 }
 
 /** Unrecorded mornings strictly between the latest record and `today`. */
@@ -140,27 +211,6 @@ export function missingSinceLatest(records: Records, today: DateKey): DateKey[] 
   // Cap the list so a long break doesn't produce hundreds of rows.
   for (let i = 1; i < span && out.length < 60; i++) out.push(addDays(last, i));
   return out;
-}
-
-/** Unrecorded mornings between the first and last record (holes in the history). */
-export function holesInHistory(records: Records): DateKey[] {
-  const keys = sortedKeys(records);
-  if (keys.length < 2) return [];
-  const out: DateKey[] = [];
-  const span = daysBetween(keys[0], keys[keys.length - 1]);
-  for (let i = 1; i < span && out.length < 400; i++) {
-    const k = addDays(keys[0], i);
-    if (!records[k]) out.push(k);
-  }
-  return out;
-}
-
-/** What streak would result if `date` were recorded as `result` (used for parent previews). */
-export function streakIfRecorded(records: Records, date: DateKey, result: NightResult | null): StreakInfo {
-  const next: Records = { ...records };
-  if (result) next[date] = result;
-  else delete next[date];
-  return computeStreak(next);
 }
 
 export function formatKeyLong(key: DateKey, locale?: string): string {

@@ -1,86 +1,118 @@
-# Zef's Dry Night Quest
+# Zef's Dino Underpants Quest
 
-A small 3D candy adventure for a four-year-old that celebrates dry nights.
-Every consecutive dry night moves Zef and his dragon friend Pip one stop
-closer to a magnificent candy castle — fifteen stops, each with its own
-playful surprise. On a wet morning, Pip gives Zef a huge, cozy hug and the
-journey starts again from the cottage; everything Zef has discovered stays
-in his keepsake collection.
+A morning ritual for a four-year-old learning to stay dry at night. Zef
+wakes up, runs to a grown-up, and presses one big button himself: the
+smiling sun for a dry night, or the heart for a not-dry night. Coach Rex,
+a big friendly T. rex, does the rest.
 
 Everything you see is built in code with React Three Fiber and Three.js:
-characters, candy architecture, plants, water, particles and lighting. The
-game loads no images, models, fonts or other external files, and it makes
-no network requests.
+the dinosaurs, the lands, the props and the effects. Coach Rex's voice is
+pre-recorded into small audio clips that ship with the game. The game
+loads nothing from the internet and makes no AI calls while it runs.
 
-## Playing
+## The morning
 
-- **Tap the ground** to walk. Zef can roam everywhere the path lights are
-  awake; future stops stay visible but sleepy until a dry night wakes them.
-- **Tap a glowing surprise** to walk over and play. Each one is a gesture:
-  swipe, tap, drag or spin. A friendly ghost glove shows how if Zef waits.
-- **Tap Pip** any time for a giggle, a flip, a dance or a sparkly puff.
-- **Tap the keepsake shelf** by the cottage to see (and play with) every
-  surprise Zef has ever found.
-- Once the castle is earned, a **candy balloon** by the cottage flies there
-  any time, and the castle stays open until a grown-up starts a new adventure.
+1. **Tap to start.** Coach Rex says good morning.
+2. **Press a button.**
+   - **Dry!** A big star flies onto the next stepping stone, Zef's dino
+     hops onto it, the underpants meter ticks up, and one surprise plays.
+     The surprises rotate:
+     - a mystery egg with a new accessory (caps, sunglasses, a basketball
+       jersey, a soccer ball, sneakers, a cape and more)
+     - a high five with Coach Rex
+     - a dance party
+     - a roar-off
+   - **Not dry.** Coach Rex walks over for a big hug ("My arms are tiny,
+     but my hugs are huge!"). The underpants meter starts fresh. Every star
+     stays.
+3. **See you tomorrow!** A replay button lets Zef watch it again. One press
+   counts per morning, and refreshing never replays or double-counts.
 
-### The fifteen surprises
+## Two things to fill up
 
-| Region | Stops |
-| --- | --- |
-| Strawberry Garden | 1 swipe open the strawberry-flower gate · 2 tap jellybean beetles into a parade · 3 send Pip down the jam slide |
-| Marshmallow Cloud Meadow | 4 bounce on a marshmallow cloud · 5 drag bubbles into a silly bubble sheep · 6 spin the peppermint windmill (the breeze moves everything) |
-| Lemonade River | 7 steer the lemon-slice boat across · 8 braid licorice into a little bridge · 9 pop fizzy bubbles until the bubble whale rises |
-| Waffle Woodland | 10 knock on a waffle-tree door (a different friend each time) · 11 trace a path for the syrup fireflies · 12 spin the cookie carousel |
-| Gumdrop Mountain | 13 light the gumdrop lanterns in any order · 14 tap castle towers to light their windows · 15 open the castle doors and go inside |
+- **Stars (the board).** Every dry morning is a star, and stars never go
+  away. The board winds through seven lands: Jungle Jumble, Volcano Valley,
+  Splashy Lagoon, Fossil Canyon, Snowball Mountain, Crystal Caves and
+  Rainbow Meadow. Each land ends at a treasure chest with a real-world
+  prize. The first chest is at 10 stars, then one every 15 stars (25, 40,
+  55, ...). The default prizes are candy, movie night, McDonald's, a
+  squishy, candy, and a pizza party, then the list starts over. All of
+  them can be edited.
+- **The underpants meter.** This counts dry nights in a row and has the
+  underpants at the top. When it fills, a pterodactyl flies Zef to the
+  Underpants Store, where he picks his own dino underpants. His dino wears
+  them from then on, and then it's time for the real ones. The default goal
+  is 20 and can be changed.
 
-Inside the castle are the **caramel-fountain hall** (fountain, chandelier,
-cake throne with a crown, licorice organ, gingerbread guards) and the
-**secret moonlit candy garden** (singing flowers, moon pond, swing, sleepy
-owl, a winking moon and shooting stars).
+A morning with no record is unknown. It never counts as dry or not dry: it
+doesn't add a star and doesn't reset the meter.
+
+## First time
+
+1. A grown-up enters the name (Zef).
+2. Zef picks his dino (T. rex, triceratops, stegosaurus or long-neck) and
+   its color.
+3. Coach Rex explains the mission.
 
 ## Parent corner
 
 Press and hold the moon button (top right), then answer a quick
-multiplication question.
+multiplication question. In the parent corner you can:
 
-- **Dry night / Wet night** for last night, each with a confirmation that
-  says exactly what will happen.
-- **Dated history**: one result per local morning. Correct any day; the
-  streak is recalculated. Unrecorded nights are shown as *Not recorded*.
-  They never count as dry or wet, but a streak only continues across nights
-  recorded dry, and the panel explains this whenever there's a gap.
-- **Preview** any stop's arrival or the hug without changing real progress.
-- **Sound** (starts muted) and **reduced motion** settings.
-- **Backup**: export to a file (or copy the text) and import it again.
-- **Start a new adventure** clears progress (with a second confirmation).
+- record or correct any morning, with a note on exactly what will change
+- see stars, the meter, the best run, the next prize and the last four
+  weeks
+- set the underpants goal; it shows how long the goal typically takes at
+  the recent dry rate
+- edit the prizes and tick off the ones you've handed over
+- preview a dry morning, the hug, a prize chest, the Underpants Store or the
+  intro, without changing real progress
+- change the name, dino and color, and turn sound, music and reduced motion
+  on or off
+- back up and restore (old candy-castle backups bring their nights along)
+- start a new quest
 
-Progress is saved in this browser's local storage. Repeat taps and
-refreshes never advance the journey twice: results are stored per date, and
-the game remembers which arrivals and hugs Zef has already seen.
+Progress is saved in this browser's local storage.
+
+## Coach Rex's voice
+
+The lines live in `src/voice/lines.ts`. `scripts/voice/generate.py` records
+them with the open-source Kokoro voice model into `src/voice/clips/`, then
+brightens and evens them out with ffmpeg. Re-running it only re-records
+lines that changed. Lines that say "Zef" have name-free twins ("buddy")
+used if the name is changed.
+
+To use a different voice, replace the clips with files of the same names.
+
+```sh
+python scripts/voice/generate.py --models <folder with kokoro-v1.0.onnx and voices-v1.0.bin> --voice am_fenrir --speed 1.2 --pitch 1
+```
 
 ## Developing
 
 ```sh
 npm install
 npm run dev          # http://localhost:5173
-npm test             # progress / save logic unit tests
+npm test             # progress, save and voice-line tests
 npm run build        # static site in dist/
 npm run build:single # one self-contained HTML file in dist-single/
 ```
 
-`?debug` in the URL exposes a small test API on `window.__zef` (record
-nights, preview stops, project objects to the screen). The scripts in
-`scripts/` use it with Playwright to drive the game, film arrivals, the hug,
-and every surprise.
+`?debug` in the URL exposes a small test API on `window.__dino`. With it
+you can seed nights, press the buttons, run previews, and project dinos and
+props to screen positions. The `scripts/dino-*.mjs` files use it with
+Playwright to play through setup, mornings, chests, the store and the
+parent corner.
 
 ### Layout
 
-- `src/state` — dates, streaks, save data, import/export (pure, unit tested)
-- `src/game` — route, movement, camera rig, director (cutscenes), actors
-- `src/characters` — Zef and Pip, jointed rigs with procedural animation
-- `src/world` — terrain, path, sky, cottage, castle, regions, keepsakes
-- `src/stops` — the fifteen interactive surprises
-- `src/scenes` — the hug nook and the castle rooms
-- `src/three` — procedural geometry, candy materials, shaders, particles
-- `src/ui` — the HTML overlay: parent corner, hug message, sound toggle
+- `src/state`: dates, stars, the meter, prizes, save data, import/export
+  (pure and unit tested)
+- `src/game`: the director (every morning event), actors, camera, rewards
+- `src/dino`: jointed dinosaur rigs, the animator, accessories, underpants
+- `src/board`: the lands, path, chests, props, landmarks, sky and lights
+- `src/store`: the Underpants Store
+- `src/setup`: the pick-your-dino stage
+- `src/voice`: Coach Rex's lines and the clip player
+- `src/audio`: sound effects and music, all synthesized
+- `src/ui`: the big buttons, the meter, captions and the parent corner

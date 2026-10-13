@@ -1,15 +1,15 @@
 // Test hooks, only installed when the page URL has ?debug. They let automated
-// checks drive the game (record nights, project objects to the screen).
+// checks drive the game (record nights, press buttons, project objects).
 
 import * as THREE from 'three';
-import { cam, pip, timeScale, zef } from './game/actors';
+import { cam, coach, hero, timeScale } from './game/actors';
 import { useGame, useSave } from './state/store';
 import { addDays, todayKey } from './state/progress';
-import { localToWorld, stopWorldPoints } from './world/stopDefs';
-import { startPreview, endPreview } from './game/director';
-import { placeAtStop } from './game/world';
-import { goToShelf } from './world/Keepsakes';
-import { debugState, debugTargets } from './game/debugTargets';
+import { endPreview, pressDry, pressWet, replayToday, startFromSplash, startPreview, tapCoach, tapHero, resetBoardView } from './game/director';
+import { fx } from './board/EventProps';
+import { chestPos } from './board/layout';
+import { pedestalHeight, pedestalPos } from './store/StoreScene';
+import type { PreviewKind } from './state/store';
 
 export function installDebug() {
   if (typeof window === 'undefined' || !new URLSearchParams(location.search).has('debug')) return;
@@ -19,9 +19,10 @@ export function installDebug() {
   // software-rendered test browsers run at a few fps: let game time keep up
   timeScale.maxDt = Number(q.get('maxdt') ?? '0.25');
   const api = {
-    zef,
-    pip,
+    hero,
+    coach,
     cam,
+    fx,
     game: () => useGame.getState(),
     save: () => useSave.getState().data,
     record(dateOffset: number, result: 'dry' | 'wet' | null) {
@@ -30,33 +31,51 @@ export function installDebug() {
     recordRun(n: number, endOffset = 0) {
       for (let i = n - 1; i >= 0; i--) useSave.getState().record(addDays(todayKey(), endOffset - i), 'dry');
     },
+    /** Jump the board: n dry nights ending yesterday, all already seen. */
+    seed(n: number, opts: { wetLast?: boolean; setup?: boolean } = {}) {
+      const s = useSave.getState();
+      for (let i = n; i >= 1; i--) s.record(addDays(todayKey(), -i), 'dry');
+      if (opts.wetLast) s.record(addDays(todayKey(), -1), 'wet');
+      const d = useSave.getState().data;
+      const quest = { stars: Object.values(d.records).filter((r) => r === 'dry').length };
+      s.markSeen({ stars: quest.stars, prizes: Math.max(0, quest.stars >= 10 ? 1 + Math.floor((quest.stars - 10) / 15) : 0), meter: opts.wetLast ? 0 : n, hugDate: opts.wetLast ? addDays(todayKey(), -1) : null, underpants: d.underpants.earned });
+      if (opts.setup !== false) s.setProfile({ setupDone: true });
+    },
+    splash: startFromSplash,
+    dry: pressDry,
+    wet: pressWet,
+    replay: replayToday,
+    tapHero,
+    tapCoach,
+    preview(kind: PreviewKind) {
+      startPreview(kind);
+    },
+    endPreview,
+    resetBoardView,
     setParentOpen(v: boolean) {
       useGame.getState().set({ parentOpen: v });
     },
-    preview(stop: number) {
-      startPreview(stop === 0 ? { kind: 'hug', stop: 0 } : { kind: 'stop', stop });
+    heroScreen() {
+      return api.project(hero.pos.clone().add(new THREE.Vector3(0, 0.6 + hero.air, 0)));
     },
-    endPreview,
-    shelf() {
-      goToShelf();
+    coachScreen() {
+      return api.project(coach.pos.clone().add(new THREE.Vector3(0, 1.2, 0)));
     },
-    castle(room: 'hall' | 'garden' = 'hall') {
-      useGame.getState().set({ scene: 'castle', room, cutscene: null });
+    eggScreen() {
+      return api.project(fx.egg.pos.clone().add(new THREE.Vector3(0, 0.45, 0)));
     },
-    goto(i: number, lit = 15) {
-      useGame.getState().set({ litStop: lit, cutscene: null });
-      placeAtStop(i);
+    handScreen() {
+      return api.project(fx.hand.pos.clone());
     },
-    localScreen(stop: number, x: number, y: number, z: number) {
-      return api.project(localToWorld(stop, [x, y, z]));
+    chestScreen(land: number) {
+      return api.project(chestPos(land).clone().add(new THREE.Vector3(0, 0.9, 0)));
     },
-    state(name: string) {
-      const f = debugState.get(name);
-      return f ? f() : null;
+    pedestalScreen(i: number) {
+      return api.project(pedestalPos(i).clone().add(new THREE.Vector3(0, pedestalHeight(i) + 0.45, 0)));
     },
-    targets(name: string) {
-      const f = debugTargets.get(name);
-      return f ? f().map((p) => api.project(p)) : [];
+    info() {
+      const r = (window as unknown as { __renderer?: THREE.WebGLRenderer }).__renderer;
+      return r ? { calls: r.info.render.calls, triangles: r.info.render.triangles, geometries: r.info.memory.geometries, textures: r.info.memory.textures, programs: r.info.programs?.length } : null;
     },
     heavy(n = 25) {
       const scene = (window as unknown as { __scene?: THREE.Scene }).__scene;
@@ -73,19 +92,11 @@ export function installDebug() {
         if (bs && m.frustumCulled !== false && !frustum.intersectsSphere(bs)) return;
         const t = (m.geometry.index ? m.geometry.index.count : m.geometry.getAttribute('position').count) / 3;
         const count = im.isInstancedMesh ? im.count : 1;
-        const label = (m.geometry.name || '') + '|' + ((m.material as THREE.Material).name || (m.material as THREE.Material).type) + '|' + (o.parent?.type ?? '');
+        const label = (m.geometry.name || '') + '|' + ((m.material as THREE.Material).name || (m.material as THREE.Material).type);
         rows.push({ name: label, tris: Math.round(t * count), shadow: m.castShadow });
       });
       rows.sort((a, b) => b.tris - a.tris);
       return rows.slice(0, n);
-    },
-    info() {
-      const r = (window as unknown as { __renderer?: THREE.WebGLRenderer }).__renderer;
-      return r ? { calls: r.info.render.calls, triangles: r.info.render.triangles, geometries: r.info.memory.geometries, textures: r.info.memory.textures, programs: r.info.programs?.length } : null;
-    },
-    stopScreen(i: number, which: 'object' | 'zef' | 'light' = 'object') {
-      const w = stopWorldPoints(i);
-      return api.project(w[which]);
     },
     project(p: THREE.Vector3) {
       const camera = (window as unknown as { __camera?: THREE.Camera }).__camera;
@@ -94,5 +105,5 @@ export function installDebug() {
       return { x: ((v.x + 1) / 2) * innerWidth, y: ((1 - v.y) / 2) * innerHeight };
     },
   };
-  (window as unknown as { __zef: typeof api }).__zef = api;
+  (window as unknown as { __dino: typeof api }).__dino = api;
 }

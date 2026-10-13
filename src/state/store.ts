@@ -3,140 +3,193 @@
 import { create } from 'zustand';
 import {
   applyDerived,
+  clampGoal,
   loadSave,
-  newAdventure,
+  newQuest,
   persistSave,
+  seenFromRecords,
   withRecord,
+  type Profile,
   type SaveData,
   type Seen,
   type Settings,
 } from './save';
-import { computeStreak, STOP_COUNT, type DateKey, type NightResult } from './progress';
+import { computeQuest, type DateKey, type NightResult, type QuestState } from './progress';
+import type { Prize, Slot } from '../game/rewards';
 
 interface SaveStore {
   data: SaveData;
   storageOk: boolean;
   record: (date: DateKey, result: NightResult | null) => void;
   setSettings: (patch: Partial<Settings>) => void;
+  setProfile: (patch: Partial<Profile>) => void;
+  setGoal: (goal: number) => void;
+  setPrizes: (prizes: Prize[]) => void;
+  setPrizeGiven: (i: number, given: boolean) => void;
+  setOutfit: (slot: Slot, accessory: number) => void;
+  pickUnderpants: (design: number) => void;
+  undoUnderpants: () => void;
   markSeen: (patch: Partial<Seen>) => void;
   replace: (data: SaveData) => void;
-  startNewAdventure: () => void;
+  startNewQuest: () => void;
 }
 
 function commit(data: SaveData): boolean {
   return persistSave(data);
 }
 
-export const useSave = create<SaveStore>((set, get) => ({
-  data: loadSave(),
-  storageOk: true,
-  record(date, result) {
-    const prev = get().data;
-    const next = withRecord(prev, date, result);
-    if (next === prev) return;
-    set({ data: next, storageOk: commit(next) });
-  },
-  setSettings(patch) {
-    const next = { ...get().data, settings: { ...get().data.settings, ...patch } };
-    set({ data: next, storageOk: commit(next) });
-  },
-  markSeen(patch) {
-    const next = { ...get().data, seen: { ...get().data.seen, ...patch } };
-    set({ data: next, storageOk: commit(next) });
-  },
-  replace(data) {
-    const next = applyDerived(data);
-    set({ data: next, storageOk: commit(next) });
-  },
-  startNewAdventure() {
-    const next = newAdventure(get().data);
-    set({ data: next, storageOk: commit(next) });
-  },
-}));
+export const useSave = create<SaveStore>((set, get) => {
+  const put = (next: SaveData) => set({ data: next, storageOk: commit(next) });
+  return {
+    data: loadSave(),
+    storageOk: true,
+    record(date, result) {
+      const prev = get().data;
+      const next = withRecord(prev, date, result);
+      if (next !== prev) put(next);
+    },
+    setSettings(patch) {
+      put({ ...get().data, settings: { ...get().data.settings, ...patch } });
+    },
+    setProfile(patch) {
+      put({ ...get().data, profile: { ...get().data.profile, ...patch } });
+    },
+    setGoal(goal) {
+      const d = get().data;
+      put(applyDerived({ ...d, rules: { ...d.rules, goal: clampGoal(goal) } }));
+    },
+    setPrizes(prizes) {
+      put({ ...get().data, prizes });
+    },
+    setPrizeGiven(i, given) {
+      const d = get().data;
+      const s = new Set(d.prizesGiven);
+      if (given) s.add(i);
+      else s.delete(i);
+      put({ ...d, prizesGiven: [...s].sort((a, b) => a - b) });
+    },
+    setOutfit(slot, accessory) {
+      const d = get().data;
+      put({ ...d, outfit: { ...d.outfit, [slot]: accessory } });
+    },
+    pickUnderpants(design) {
+      const d = get().data;
+      put({ ...d, underpants: { ...d.underpants, pick: design } });
+    },
+    undoUnderpants() {
+      const d = get().data;
+      const next = applyDerived({ ...d, underpants: { earned: false, on: null, pick: null } });
+      put({ ...next, seen: { ...next.seen, underpants: next.underpants.earned } });
+    },
+    markSeen(patch) {
+      put({ ...get().data, seen: { ...get().data.seen, ...patch } });
+    },
+    replace(data) {
+      put(applyDerived(data));
+    },
+    startNewQuest() {
+      const next = newQuest(get().data);
+      put({ ...next, seen: seenFromRecords(next) });
+    },
+  };
+});
 
-export type SceneId = 'world' | 'castle' | 'hug';
-export type Room = 'hall' | 'garden';
+/** What the morning screen and the 3D board are showing. */
+export type Phase =
+  | 'boot'
+  | 'setup' // first-time: name, pick a dino, the mission
+  | 'splash' // tap the egg to start (unlocks sound)
+  | 'ask' // the two big buttons
+  | 'event' // a celebration, hug, prize or store visit is playing
+  | 'done'; // today is recorded: see you tomorrow
+
+export type PreviewKind = 'dry' | 'wet' | 'prize' | 'store' | 'intro';
 
 export interface PreviewState {
-  kind: 'stop' | 'hug';
-  stop: number;
+  kind: PreviewKind;
 }
 
+/** A line of text shown while the coach talks (also read to screen readers). */
+export interface Caption {
+  text: string;
+  who: 'coach' | 'zef';
+}
+
+export type SceneId = 'board' | 'store' | 'setup';
+export type SetupStep = 'name' | 'dino' | 'color';
+
 interface GameStore {
+  phase: Phase;
   scene: SceneId;
-  room: Room;
+  setupStep: SetupStep | null;
+  /** accessories the board shows as unlocked (the egg reveals the newest) */
+  shownAccessories: number;
+  /** chests the board shows as opened */
+  openedChests: number;
+  /** the dino wears its store underpants */
+  showUnderpants: boolean;
+  /** underpants picked during a preview (never saved) */
+  previewUnderpants: number | null;
+  /** the overlay piece Coach Rex is talking about */
+  highlight: 'meter' | 'stars' | null;
   preview: PreviewState | null;
-  /** name of the running cutscene, null while Zef is free to play */
+  /** name of the running event, null when idle */
   cutscene: string | null;
-  /** stop Zef is standing at with the camera framing it */
-  focusStop: number | null;
-  /** keepsake shelf is being looked at */
-  shelfFocus: boolean;
   parentOpen: boolean;
-  hugCaption: boolean;
+  caption: Caption | null;
   /** 0 = clear, 1 = covered (scene transitions) */
   fade: number;
-  /** stop whose interaction hint should show */
-  hintStop: number | null;
+  /** the 3D scene has built */
+  ready: boolean;
+  /** the board land in view */
+  land: number;
+  /** star count the board shows (animates up during a celebration) */
+  shownStars: number;
+  /** meter value the overlay shows (animates during events) */
+  shownMeter: number;
+  /** the store scene is showing instead of the board */
+  inStore: boolean;
+  /** dress-up shelf is open */
+  dressUp: boolean;
+  /** waiting for the child to tap something during an event */
+  awaiting: null | 'highfive' | 'egg' | 'roar' | 'chest' | 'store-pick' | 'hug-done';
   /** increments to ask the director to re-check progress */
   checkToken: number;
-  /** path lights currently awake (stops reachable in the world right now) */
-  litStop: number;
-  /** the 3D scene has built and is ready for cutscenes */
-  ready: boolean;
   set: (patch: Partial<Omit<GameStore, 'set'>>) => void;
 }
 
 export const useGame = create<GameStore>((set) => ({
-  scene: 'world',
-  room: 'hall',
+  phase: 'boot',
+  scene: 'board',
+  setupStep: null,
+  shownAccessories: 0,
+  openedChests: 0,
+  showUnderpants: true,
+  previewUnderpants: null,
+  highlight: null,
   preview: null,
   cutscene: null,
-  focusStop: null,
-  shelfFocus: false,
   parentOpen: false,
-  hugCaption: false,
+  caption: null,
   fade: 0,
-  hintStop: null,
-  checkToken: 0,
-  litStop: 0,
   ready: false,
+  land: 0,
+  shownStars: 0,
+  shownMeter: 0,
+  inStore: false,
+  dressUp: false,
+  awaiting: null,
+  checkToken: 0,
   set: (patch) => set(patch),
 }));
 
-export interface Journey {
-  activeStop: number;
-  castleUnlocked: boolean;
-  keepsakes: Set<number>;
-  streak: number;
-  isPreview: boolean;
+export function questOf(data: SaveData): QuestState {
+  return computeQuest(data.records, data.rules);
 }
 
-export function journeyOf(data: SaveData, preview: PreviewState | null): Journey {
-  if (preview) {
-    const stop = preview.kind === 'hug' ? 0 : preview.stop;
-    const keepsakes = new Set<number>();
-    for (let i = 1; i <= Math.max(stop, preview.kind === 'hug' ? 5 : 0); i++) keepsakes.add(i);
-    return { activeStop: stop, castleUnlocked: stop >= STOP_COUNT, keepsakes, streak: stop, isPreview: true };
-  }
-  const info = computeStreak(data.records);
-  return {
-    activeStop: info.activeStop,
-    castleUnlocked: data.castleUnlocked,
-    keepsakes: new Set(data.keepsakes),
-    streak: info.streak,
-    isPreview: false,
-  };
-}
-
-/** React hook for the journey the child currently sees (real or preview). */
-export function useJourney(): Journey {
-  const data = useSave((s) => s.data);
-  const preview = useGame((s) => s.preview);
-  return journeyOf(data, preview);
-}
-
-/** Non-reactive read for per-frame code. */
-export function currentJourney(): Journey {
-  return journeyOf(useSave.getState().data, useGame.getState().preview);
+/** React hook for the quest numbers. */
+export function useQuest(): QuestState {
+  const records = useSave((s) => s.data.records);
+  const rules = useSave((s) => s.data.rules);
+  return computeQuest(records, rules);
 }
