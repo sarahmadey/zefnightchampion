@@ -5,11 +5,18 @@
 
 import { audio, audioIfReady, duckMusic } from '../audio/core';
 import { clipId, lineText } from './lines';
+import { index, pack } from 'virtual:voice-pack';
 
-const clipUrls = import.meta.glob('./clips/*.mp3', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+let bytes: Uint8Array | null = null;
 
-function urlFor(id: string): string | null {
-  return clipUrls[`./clips/${id}.mp3`] ?? null;
+/** The packed clips as bytes, decoded once on first use. */
+function packBytes(): Uint8Array {
+  if (!bytes) {
+    const bin = atob(pack);
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  }
+  return bytes;
 }
 
 const cache = new Map<string, Promise<AudioBuffer | null>>();
@@ -18,18 +25,18 @@ const order: string[] = [];
 function load(id: string): Promise<AudioBuffer | null> {
   const hit = cache.get(id);
   if (hit) return hit;
-  const url = urlFor(id);
+  const range = index[id];
   const c = audio();
-  if (!url || !c) return Promise.resolve(null);
-  const p = fetch(url)
-    .then((r) => r.arrayBuffer())
-    .then(
-      (buf) =>
-        new Promise<AudioBuffer | null>((resolve) => {
-          c.ctx.decodeAudioData(buf, (b) => resolve(b), () => resolve(null));
-        }),
-    )
-    .catch(() => null);
+  if (!range || !c) return Promise.resolve(null);
+  // decodeAudioData takes ownership of its buffer, so hand it a copy
+  const buf = packBytes().slice(range[0], range[0] + range[1]).buffer;
+  const p = new Promise<AudioBuffer | null>((resolve) => {
+    try {
+      c.ctx.decodeAudioData(buf, (b) => resolve(b), () => resolve(null));
+    } catch {
+      resolve(null);
+    }
+  });
   cache.set(id, p);
   order.push(id);
   while (order.length > 24) {
@@ -40,7 +47,7 @@ function load(id: string): Promise<AudioBuffer | null> {
 }
 
 export function hasClip(id: string): boolean {
-  return !!urlFor(id);
+  return !!index[id];
 }
 
 let current: AudioBufferSourceNode | null = null;
