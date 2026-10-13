@@ -25,6 +25,7 @@ import { STOP_NAMES } from '../game/route';
 import { startPreview } from '../game/director';
 import { sfx } from '../audio/sfx';
 import { CloseIcon, CloudHeartIcon, EyeIcon, MoonLockIcon, SunIcon } from './icons';
+import { viewerDownloads } from './viewerDownloads';
 
 // ------------------------------------------------------------ the button
 
@@ -217,6 +218,7 @@ export function ParentPanel() {
       setMessage(null);
       setExportText(null);
       setTimeout(() => closeBtn.current?.focus(), 30);
+      void viewerDownloads();
     }
   }, [open]);
 
@@ -263,15 +265,33 @@ export function ParentPanel() {
   const rows: DateKey[] = [];
   for (let i = 0; i <= Math.min(span, showDays - 1); i++) rows.push(addDays(today, -i));
 
-  const doExport = () => {
+  const doExport = async () => {
     const text = exportBackup(data);
+    const filename = `zef-dry-night-quest-backup-${today}.json`;
     setExportText(text);
+    const viewer = await viewerDownloads();
+    if (viewer) {
+      try {
+        await viewer.save({ filename, data: text });
+        setMessage('Backup file saved.');
+      } catch (e) {
+        const code = (e as { code?: string } | null)?.code;
+        setMessage(
+          code === 'declined'
+            ? 'Backup not saved. You can copy the text below instead.'
+            : code === 'rate_limited'
+              ? 'A save prompt is already open.'
+              : 'Saving a file is not available here. Copy the backup text below instead.',
+        );
+      }
+      return;
+    }
     try {
       const blob = new Blob([text], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `zef-dry-night-quest-backup-${today}.json`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -490,7 +510,41 @@ export function ParentPanel() {
             </label>
           </div>
           {exportText && (
-            <textarea className="code" readOnly value={exportText} rows={5} aria-label="Backup text" onFocus={(e) => e.currentTarget.select()} />
+            <>
+              <textarea
+                id="backup-text"
+                className="code"
+                readOnly
+                value={exportText}
+                rows={5}
+                aria-label="Backup text"
+                onFocus={(e) => e.currentTarget.select()}
+              />
+              <button
+                className="btn small"
+                onClick={() => {
+                  const select = () => {
+                    const el = document.getElementById('backup-text') as HTMLTextAreaElement | null;
+                    el?.focus();
+                    el?.select();
+                  };
+                  try {
+                    navigator.clipboard
+                      .writeText(exportText)
+                      .then(() => setMessage('Backup text copied.'))
+                      .catch(() => {
+                        select();
+                        setMessage('Select the text above and copy it.');
+                      });
+                  } catch {
+                    select();
+                    setMessage('Select the text above and copy it.');
+                  }
+                }}
+              >
+                Copy backup text
+              </button>
+            </>
           )}
           <details>
             <summary>Paste backup text instead</summary>
