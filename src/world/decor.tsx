@@ -2,7 +2,8 @@
 // many props), a wind-sway material, and terrain-aware scatter placement that
 // keeps the path, stops and lights clear.
 
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { STOPS, nearestOnRoute, pathXAtZ, terrainHeight, WATER_Y, riverInfo } from '../game/route';
 import { STOP_DEFS, stopWorldPoints } from './stopDefs';
@@ -17,6 +18,31 @@ export interface Placement {
   tilt?: [number, number];
 }
 
+const cullSphere = new THREE.Sphere();
+
+/**
+ * Hide an object when the camera is far from it (beyond `maxDist` from the
+ * edge of its bounding sphere). Small repeated decorations fade into the fog
+ * anyway, so skipping them keeps phones fast.
+ */
+export function useDistanceCull(ref: RefObject<THREE.Object3D | null>, maxDist: number | undefined, center?: THREE.Vector3, radius = 0) {
+  useFrame(({ camera }) => {
+    const o = ref.current;
+    if (!o || !maxDist) return;
+    if (center) {
+      o.visible = camera.position.distanceTo(center) - radius < maxDist;
+      return;
+    }
+    const mesh = o as THREE.Mesh;
+    if (!mesh.geometry && !(o as THREE.InstancedMesh).isInstancedMesh) return;
+    const im = o as THREE.InstancedMesh;
+    const bs = im.isInstancedMesh ? im.boundingSphere : mesh.geometry.boundingSphere;
+    if (!bs) return;
+    cullSphere.copy(bs).applyMatrix4(o.matrixWorld);
+    o.visible = camera.position.distanceTo(cullSphere.center) - cullSphere.radius < maxDist;
+  });
+}
+
 const m4 = new THREE.Matrix4();
 const q = new THREE.Quaternion();
 const e = new THREE.Euler();
@@ -28,14 +54,17 @@ export function InstancedSet({
   items,
   castShadow = false,
   receiveShadow = false,
+  maxDist,
 }: {
   geometry: THREE.BufferGeometry;
   material: THREE.Material;
   items: Placement[];
   castShadow?: boolean;
   receiveShadow?: boolean;
+  maxDist?: number;
 }) {
   const ref = useRef<THREE.InstancedMesh>(null!);
+  useDistanceCull(ref, maxDist);
   useLayoutEffect(() => {
     const mesh = ref.current;
     const col = new THREE.Color();

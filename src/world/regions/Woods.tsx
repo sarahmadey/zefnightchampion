@@ -55,7 +55,7 @@ export function waffleTreeGeometry(v: number) {
         [0, 1.2],
       ],
       64,
-      40,
+      26,
     );
     waffleGrid(canopy, 0.42, 0.07, '#f2b45a', '#c4802e');
     canopy.translate(0, H, 0);
@@ -282,11 +282,11 @@ export function Woods() {
   return (
     <group>
       {trees.map((items, v) => (
-        <InstancedSet key={v} geometry={waffleTreeGeometry(v)} material={vcolor(0.5, 'waffle-tree')} items={items} castShadow receiveShadow />
+        <InstancedSet key={v} geometry={waffleTreeGeometry(v)} material={vcolor(0.5, 'waffle-tree')} items={items} castShadow receiveShadow maxDist={75} />
       ))}
-      <InstancedSet geometry={doorGeometry()} material={vcolor(0.5, 'tinydoor')} items={doors.out} />
-      <InstancedSet geometry={windowGeometry()} material={emissive('#ffd36b', 1.6)} items={doors.wins} />
-      <InstancedSet geometry={mushroomGeometry()} material={vcolor(0.45, 'mushroom')} items={mushrooms} />
+      <InstancedSet geometry={doorGeometry()} material={vcolor(0.5, 'tinydoor')} items={doors.out} maxDist={60} />
+      <InstancedSet geometry={windowGeometry()} material={emissive('#ffd36b', 1.6)} items={doors.wins} maxDist={80} />
+      <InstancedSet geometry={mushroomGeometry()} material={vcolor(0.45, 'mushroom')} items={mushrooms} maxDist={45} />
       {mushrooms.slice(0, 8).map((m, i) => (
         <Wobbly
           key={i}

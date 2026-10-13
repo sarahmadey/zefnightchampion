@@ -355,11 +355,12 @@ export function balloonTrip(fly: (u: number) => void) {
     bus.emit('balloonGo');
     sfx.play('whoosh');
     const dur = motion.reduced ? 3 : 9;
-    let t = 0;
-    while (t < dur) {
-      await ctx.wait(1 / 30);
-      t += 1 / 30;
-      fly(Math.min(1, t / dur));
+    const start = clock.time;
+    for (;;) {
+      await ctx.wait(0);
+      const u = Math.min(1, (clock.time - start) / dur);
+      fly(u);
+      if (u >= 1) break;
     }
     await fade(ctx, 1, 0.6);
     zef.scripted = false;

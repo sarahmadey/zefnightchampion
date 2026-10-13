@@ -269,8 +269,8 @@ export function extrude(shape: THREE.Shape, depth: number, bevel: number, curveS
 }
 
 /** A cupped petal: flat petal shape bent into a bowl (for flowers and the gate). */
-export function cuppedPetal(len: number, width: number, cup: number, thickness = 0.02): THREE.BufferGeometry {
-  const g = extrude(petalShape(len, width), thickness, thickness * 0.5, 10);
+export function cuppedPetal(len: number, width: number, cup: number, thickness = 0.02, curveSegments = 10): THREE.BufferGeometry {
+  const g = extrude(petalShape(len, width), thickness, thickness * 0.5, curveSegments);
   const pos = g.getAttribute('position') as THREE.BufferAttribute;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -310,8 +310,8 @@ export function pipedSwirl(opts: {
   pts.push([0, H + th * 0.6, 0]);
   const curve = curveFrom(pts, 0.5);
   return tube(curve, {
-    segments: n * 3,
-    radial: ridges * 4,
+    segments: Math.ceil(n * 1.6),
+    radial: ridges * 2,
     radius: (t, a) => {
       const base = th * (1 - t * 0.55) * (t < 0.04 ? 0.6 + t * 10 : 1) * (t > 0.92 ? Math.max(0.05, (1 - t) / 0.08) : 1);
       return base * (1 + 0.16 * Math.cos(a * ridges));
@@ -428,7 +428,7 @@ export function puffGeometry(seed: number, blobs = 7, spread = 1, detail = 3): T
 }
 
 /** Gumdrop silhouette: flat base, soft shoulders, rounded top. */
-export function gumdropGeometry(segments = 28): THREE.BufferGeometry {
+export function gumdropGeometry(segments = 28, samples = 24): THREE.BufferGeometry {
   return lathe(
     [
       [0, 0],
@@ -440,7 +440,7 @@ export function gumdropGeometry(segments = 28): THREE.BufferGeometry {
       [0, 0.78],
     ],
     segments,
-    24,
+    samples,
   );
 }
 
@@ -458,7 +458,7 @@ export function strawberryGeometry(seed = 1, seedCount = 46): THREE.BufferGeomet
     [0.18, 0.44],
     [0.0, 0.45],
   ];
-  const body = lathe(profile, 28, 26);
+  const body = lathe(profile, 22, 18);
   paint(body, (p) => {
     const t = clamp((p.y + 0.62) / 1.07, 0, 1);
     return tmpColor.set('#e8173a').lerp(new THREE.Color('#ff5a6e'), t * 0.35);
@@ -481,7 +481,7 @@ export function strawberryGeometry(seed = 1, seedCount = 46): THREE.BufferGeomet
     const y = randRange(rng, -0.48, 0.3);
     const a = i * 2.39996 + rng() * 0.3;
     const r = radiusAt(y) + 0.004;
-    const s = new THREE.SphereGeometry(0.022, 6, 4);
+    const s = new THREE.SphereGeometry(0.024, 4, 3);
     s.scale(1, 1.6, 0.6);
     const n = new THREE.Vector3(Math.cos(a), 0.15, Math.sin(a)).normalize();
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
@@ -494,7 +494,7 @@ export function strawberryGeometry(seed = 1, seedCount = 46): THREE.BufferGeomet
   const leafCount = 6;
   for (let i = 0; i < leafCount; i++) {
     const a = (i / leafCount) * TAU;
-    const leaf = cuppedPetal(0.34, 0.12, -0.05, 0.015);
+    const leaf = cuppedPetal(0.34, 0.12, -0.05, 0.015, 4);
     leaf.rotateX(-Math.PI / 2 + 0.35);
     leaf.rotateY(-a + Math.PI / 2);
     leaf.translate(Math.cos(a) * 0.08, 0.43, Math.sin(a) * 0.08);
@@ -511,8 +511,39 @@ export function strawberryGeometry(seed = 1, seedCount = 46): THREE.BufferGeomet
   return merge(parts);
 }
 
+/** A tiny low-poly strawberry for garnishes (cake rims, gate minis). */
+export function miniStrawberryGeometry(): THREE.BufferGeometry {
+  const body = lathe(
+    [
+      [0.0, -0.62],
+      [0.3, -0.3],
+      [0.46, 0.15],
+      [0.3, 0.4],
+      [0.0, 0.45],
+    ],
+    12,
+    9,
+  );
+  paint(body, (p) => {
+    // a few pale seed speckles baked into the vertex colours
+    const a = Math.atan2(p.z, p.x);
+    const speck = Math.sin(a * 9) * Math.sin(p.y * 24) > 0.85;
+    return new THREE.Color(speck ? '#ffe680' : '#e8173a');
+  });
+  const parts: THREE.BufferGeometry[] = [body];
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * TAU;
+    const leaf = new THREE.ConeGeometry(0.1, 0.32, 3, 1);
+    leaf.rotateZ(Math.PI / 2 - 0.35);
+    leaf.rotateY(-a);
+    leaf.translate(Math.cos(a) * 0.14, 0.44, Math.sin(a) * 0.14);
+    parts.push(paint(leaf, '#3fae4a'));
+  }
+  return merge(parts);
+}
+
 /** A disc with a soft rounded rim (cookies, peppermints, lily pads). */
-export function puckGeometry(r: number, h: number, segments = 48, bulge = 0.25): THREE.BufferGeometry {
+export function puckGeometry(r: number, h: number, segments = 48, bulge = 0.25, samples = 28): THREE.BufferGeometry {
   return lathe(
     [
       [0, -h / 2],
@@ -524,7 +555,7 @@ export function puckGeometry(r: number, h: number, segments = 48, bulge = 0.25):
       [0, h / 2 + h * bulge],
     ],
     segments,
-    28,
+    samples,
   );
 }
 
@@ -547,7 +578,7 @@ export function caneCurve(height: number, hook: number): THREE.CatmullRomCurve3 
 export function twistRope(curve: THREE.Curve<THREE.Vector3>, radius: number, twists: number, segments = 48): THREE.BufferGeometry {
   return tube(curve, {
     segments,
-    radial: 20,
+    radial: 12,
     radius: (t, a) => {
       const end = Math.min(t, 1 - t) < 0.02 ? 0.6 + Math.min(t, 1 - t) * 20 : 1;
       return radius * end * (1 + 0.14 * Math.cos(a * 5 + t * twists * TAU));
@@ -611,6 +642,7 @@ export function cachedGeo(key: string, make: () => THREE.BufferGeometry): THREE.
   let g = geoCache.get(key);
   if (!g) {
     g = make();
+    g.name = key;
     g.computeBoundingSphere();
     geoCache.set(key, g);
   }
@@ -731,7 +763,7 @@ export function flowRibbon(
 }
 
 /** A lemon slice: yellow rind, white pith and juicy segments (vertex coloured). */
-export function lemonSliceGeometry(r = 0.6, thick = 0.12, segments = 10): THREE.BufferGeometry {
+export function lemonSliceGeometry(r = 0.6, thick = 0.12, segments = 10, around = 96, samples = 40): THREE.BufferGeometry {
   const g = lathe(
     [
       [0, -thick / 2],
@@ -743,8 +775,8 @@ export function lemonSliceGeometry(r = 0.6, thick = 0.12, segments = 10): THREE.
       [r * 0.3, thick / 2 + 0.016],
       [0, thick / 2 + 0.018],
     ],
-    96,
-    40,
+    around,
+    samples,
   );
   const rind = new THREE.Color('#ffd21f');
   const pith = new THREE.Color('#fffbe6');

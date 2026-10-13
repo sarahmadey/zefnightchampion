@@ -8,6 +8,7 @@ import { addDays, todayKey } from './state/progress';
 import { localToWorld, stopWorldPoints } from './world/stopDefs';
 import { startPreview, endPreview } from './game/director';
 import { placeAtStop } from './game/world';
+import { goToShelf } from './world/Keepsakes';
 import { debugState, debugTargets } from './game/debugTargets';
 
 export function installDebug() {
@@ -36,6 +37,9 @@ export function installDebug() {
       startPreview(stop === 0 ? { kind: 'hug', stop: 0 } : { kind: 'stop', stop });
     },
     endPreview,
+    shelf() {
+      goToShelf();
+    },
     castle(room: 'hall' | 'garden' = 'hall') {
       useGame.getState().set({ scene: 'castle', room, cutscene: null });
     },
@@ -53,6 +57,27 @@ export function installDebug() {
     targets(name: string) {
       const f = debugTargets.get(name);
       return f ? f().map((p) => api.project(p)) : [];
+    },
+    heavy(n = 25) {
+      const scene = (window as unknown as { __scene?: THREE.Scene }).__scene;
+      const camera = (window as unknown as { __camera?: THREE.Camera }).__camera;
+      if (!scene || !camera) return [];
+      const frustum = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      const rows: { name: string; tris: number; shadow: boolean }[] = [];
+      scene.traverseVisible((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh || !m.geometry) return;
+        const im = o as THREE.InstancedMesh;
+        if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+        const bs = (im.isInstancedMesh ? im.boundingSphere : m.geometry.boundingSphere)?.clone().applyMatrix4(o.matrixWorld);
+        if (bs && m.frustumCulled !== false && !frustum.intersectsSphere(bs)) return;
+        const t = (m.geometry.index ? m.geometry.index.count : m.geometry.getAttribute('position').count) / 3;
+        const count = im.isInstancedMesh ? im.count : 1;
+        const label = (m.geometry.name || '') + '|' + ((m.material as THREE.Material).name || (m.material as THREE.Material).type) + '|' + (o.parent?.type ?? '');
+        rows.push({ name: label, tris: Math.round(t * count), shadow: m.castShadow });
+      });
+      rows.sort((a, b) => b.tris - a.tris);
+      return rows.slice(0, n);
     },
     info() {
       const r = (window as unknown as { __renderer?: THREE.WebGLRenderer }).__renderer;

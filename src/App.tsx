@@ -20,6 +20,8 @@ import { sfx } from './audio/sfx';
 import { applyMotionSetting } from './game/settings';
 import { computeStreak } from './state/progress';
 import { installDebug } from './debug';
+import { SceneEnv } from './three/SceneEnv';
+import { QualityGovernor, quality } from './game/quality';
 
 function Ticker() {
   useFrame((_, rawDt) => {
@@ -68,12 +70,14 @@ function DirectorHooks() {
   const preview = useGame((s) => s.preview);
   const records = useSave((s) => s.data.records);
   const token = useGame((s) => s.checkToken);
+  // re-check when a cutscene ends too, so a night recorded mid-cutscene still plays
+  const busy = useGame((s) => s.cutscene !== null);
   useEffect(() => {
-    if (ready && !parentOpen && !preview) {
+    if (ready && !parentOpen && !preview && !busy) {
       const t = setTimeout(() => checkProgress(), 250);
       return () => clearTimeout(t);
     }
-  }, [ready, parentOpen, preview, records, token]);
+  }, [ready, parentOpen, preview, records, token, busy]);
   return null;
 }
 
@@ -122,7 +126,7 @@ function CharView({ pose }: { pose: string }) {
   }, [pose]);
   return (
     <>
-      <color attach="background" args={['#ffe7d6']} />
+      <SceneEnv background="#ffe7d6" />
       <hemisphereLight args={['#fff3ea', '#c4a3d9', 1.4]} />
       <directionalLight position={[2, 4, 3]} intensity={2.2} />
     </>
@@ -136,7 +140,7 @@ export function App() {
     <div className="game">
       <Canvas
         shadows="percentage"
-        dpr={[1, 1.75]}
+        dpr={[1, quality.maxDpr]}
         camera={{ position: [0, 4, 14], fov: 50, near: 0.1, far: 900 }}
         gl={{ antialias: true, toneMapping: THREE.NeutralToneMapping, powerPreference: 'high-performance' }}
         aria-label="Zef's Dry Night Quest: a 3D candy world. Tap to walk, tap things to play."
@@ -163,6 +167,7 @@ export function App() {
           />
           <Particles />
           <SettingsSync />
+          <QualityGovernor enabled={!new URLSearchParams(location.search).has('debug')} />
         </Suspense>
       </Canvas>
       <Overlay />

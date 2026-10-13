@@ -10,6 +10,7 @@ import { setHugSettled } from '../game/director';
 import { cachedGeo, lumpy, merge, paint, pipedSwirl, puffGeometry, roundedBox } from '../three/geometry';
 import { emissive, gloss, marshmallow, matte, pattern, vcolor } from '../three/materials';
 import { Glow } from '../three/bits';
+import { SceneEnv } from '../three/SceneEnv';
 import { burst } from '../three/Particles';
 import { clamp, damp, dampAngle, ease, mulberry32, smoothstep } from '../three/util';
 import { motion } from '../game/settings';
@@ -32,7 +33,7 @@ const bez = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, u: number, ou
 
 function wallGeo() {
   return cachedGeo('nook-wall', () => {
-    const g = roundedBox(7, 4, 0.3, 0.1, 2);
+    const g = roundedBox(7, 7.5, 0.3, 0.1, 2);
     lumpy(g, 0.02, 2, 9);
     const rng = mulberry32(2);
     paint(g, () => new THREE.Color('#e2a46a').lerp(new THREE.Color('#c98a50'), rng() * 0.35));
@@ -184,9 +185,9 @@ export function HugNook() {
     // the camera settles close and warm
     if (t > 4.2) {
       const u = smoothstep(4.2, 8.5, t);
-      cam.pos.set(0.6 - u * 0.4, 1.55 - u * 0.2, 4.1 - u * 1.9);
-      cam.target.set(0.05, 0.85 + u * 0.12, -0.85);
-      cam.fitWidth = 3.4 - u * 1.0;
+      cam.pos.set(0.6 - u * 0.35, 1.55 + u * 0.25, 4.1 - u * 0.9);
+      cam.target.set(0.05, 0.85 + u * 0.7, -0.85);
+      cam.fitWidth = 3.4 - u * 0.7;
     }
     // little hearts float up from the hug
     if (t > 5.4) {
@@ -210,14 +211,24 @@ export function HugNook() {
 
   return (
     <group>
-      <color attach="background" args={['#3a2433']} />
+      <SceneEnv background="#3a2433" />
       <hemisphereLight args={['#ffe9d6', '#7a4a5a', 1.25]} />
       <directionalLight position={[-2.5, 3.5, 2]} intensity={1.6} color="#ffe2c0" castShadow shadow-mapSize={[1024, 1024]} shadow-radius={4} shadow-bias={-0.0005} />
       <pointLight position={[2.4, 1.9, -0.6]} intensity={6} distance={6} color="#ffbe6b" />
 
       {/* room */}
-      <mesh geometry={wallGeo()} material={vcolor(0.9, 'nookwall')} position={[0, 2, -1.6]} receiveShadow />
-      <mesh geometry={wallGeo()} material={vcolor(0.9, 'nookwall')} position={[-3.3, 2, 1.4]} rotation={[0, Math.PI / 2, 0]} receiveShadow />
+      <mesh geometry={wallGeo()} material={vcolor(0.9, 'nookwall')} position={[0, 3.75, -1.6]} receiveShadow />
+      <mesh geometry={wallGeo()} material={vcolor(0.9, 'nookwall')} position={[-3.3, 3.75, 1.4]} rotation={[0, Math.PI / 2, 0]} receiveShadow />
+      <mesh geometry={wallGeo()} material={vcolor(0.9, 'nookwall')} position={[3.3, 3.75, 1.4]} rotation={[0, -Math.PI / 2, 0]} receiveShadow />
+      {/* cosy ceiling beams */}
+      {[-1.2, 0.6, 2.4].map((z) => (
+        <mesh key={z} material={matte('#8a5532', 0.8)} position={[0, 4.6, z]}>
+          <boxGeometry args={[7, 0.3, 0.35]} />
+        </mesh>
+      ))}
+      <mesh material={matte('#c98a50', 0.9)} position={[0, 4.8, 0.8]}>
+        <boxGeometry args={[7, 0.1, 5.2]} />
+      </mesh>
       <mesh material={matte('#b97a4a', 0.8)} position={[0, -0.05, 0.8]} receiveShadow>
         <boxGeometry args={[8, 0.1, 6]} />
       </mesh>

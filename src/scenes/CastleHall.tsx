@@ -12,6 +12,7 @@ import { cachedGeo, curveFrom, extrude, gumdropGeometry, heartShape, lathe, merg
 import { emissive, gloss, jelly, matte, pattern, vcolor } from '../three/materials';
 import { makeFlowMaterial } from '../three/shaders';
 import { Glow, Wobbly } from '../three/bits';
+import { SceneEnv } from '../three/SceneEnv';
 import { burst } from '../three/Particles';
 import { sfx } from '../audio/sfx';
 import { frameDt, pipReact, zef, zefPlay } from '../game/actors';
@@ -545,8 +546,7 @@ export function CastleHall() {
 
   return (
     <group>
-      <color attach="background" args={['#3b2236']} />
-      <fog attach="fog" args={['#3b2236', 18, 40]} />
+      <SceneEnv background="#3b2236" fog={{ color: '#3b2236', near: 18, far: 40 }} />
       <hemisphereLight args={['#fff1e6', '#a0688a', 1.3]} />
       <directionalLight position={[-4, 9, 6]} intensity={1.8} color="#ffe6c8" castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-10} shadow-camera-right={10} shadow-camera-top={10} shadow-camera-bottom={-10} shadow-radius={4} shadow-bias={-0.0005} />
       <pointLight position={[0, 6.5, -1.5]} intensity={18} distance={14} color="#ffc56b" />

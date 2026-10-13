@@ -7,7 +7,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { StopFrame, useDrag, useStop, useStopWake } from './common';
 import { STOP_DEFS } from '../world/stopDefs';
-import { cachedGeo, cuppedPetal, curveFrom, extrude, merge, paint, petalShape, strawberryGeometry, tube } from '../three/geometry';
+import { cachedGeo, cuppedPetal, curveFrom, extrude, merge, miniStrawberryGeometry, paint, petalShape, strawberryGeometry, tube } from '../three/geometry';
 import { emissive, gloss, matte, vcolor, vcolorGloss } from '../three/materials';
 import { Glow, HintHand } from '../three/bits';
 import { burst } from '../three/Particles';
@@ -72,7 +72,7 @@ function archGeometry() {
       paint(c, '#ffd43b');
       parts.push(c);
       if (i === 2 || i === 4) {
-        const b = strawberryGeometry(30 + i, 20);
+        const b = miniStrawberryGeometry();
         b.rotateX(Math.PI);
         b.scale(0.3, 0.3, 0.3);
         b.translate(x, y - 0.32, 0);
@@ -287,7 +287,7 @@ export function Stop01Gate() {
             <Glow color="#ff7a90" size={2.4} opacity={0.5} position={[0, 0.6, 0]} />
           </group>
           {[0, 1, 2, 3, 4, 5].map((k) => (
-            <mesh key={k} geometry={cachedGeo('mini-berry', () => strawberryGeometry(5, 16).translate(0, 0.62, 0))} material={vcolorGloss(0.25, 0.8)} position={[Math.cos((k / 6) * TAU) * 0.9, 0, Math.sin((k / 6) * TAU) * 0.9]} scale={0.25} />
+            <mesh key={k} geometry={cachedGeo('mini-berry', () => miniStrawberryGeometry().translate(0, 0.62, 0))} material={vcolorGloss(0.25, 0.8)} position={[Math.cos((k / 6) * TAU) * 0.9, 0, Math.sin((k / 6) * TAU) * 0.9]} scale={0.25} />
           ))}
         </group>
         <Butterfly phase={0} color="#ff9fc4" open={st.openRef} />

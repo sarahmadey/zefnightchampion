@@ -15,6 +15,7 @@ import {
 import { cachedGeo, curveFrom, lumpy, merge, paint, puckGeometry, roundedBox, tube } from '../three/geometry';
 import { gloss, jelly, marshmallow, matte, vcolor } from '../three/materials';
 import { mulberry32, randRange } from '../three/util';
+import { useDistanceCull } from './decor';
 
 const PATH_HALF = 1.2;
 export const BRIDGE_Z: [number, number] = [-72.6, -66.9];
@@ -136,21 +137,21 @@ interface PaverStyle {
 
 const STYLES: Record<RegionId, PaverStyle> = {
   home: {
-    geo: () => cachedGeo('paver-cookie', () => puckGeometry(0.3, 0.07, 18, 0.3)),
+    geo: () => cachedGeo('paver-cookie', () => puckGeometry(0.3, 0.07, 14, 0.3, 9)),
     mat: () => gloss('#ffffff', 0.45, 0.4),
     colors: ['#ffc4d8', '#fff0cf', '#c9f2dc', '#ffe08a'],
     spacing: 0.72,
     layout: 'stones',
   },
   garden: {
-    geo: () => cachedGeo('paver-cookie', () => puckGeometry(0.3, 0.07, 18, 0.3)),
+    geo: () => cachedGeo('paver-cookie', () => puckGeometry(0.3, 0.07, 14, 0.3, 9)),
     mat: () => gloss('#ffffff', 0.45, 0.4),
     colors: ['#ffb3c9', '#fff0cf', '#ffd2df', '#ffe6a8'],
     spacing: 0.72,
     layout: 'stones',
   },
   meadow: {
-    geo: () => cachedGeo('paver-cushion', () => lumpy(roundedBox(0.62, 0.16, 0.62, 0.08, 3), 0.015, 3, 2)),
+    geo: () => cachedGeo('paver-cushion', () => lumpy(roundedBox(0.62, 0.16, 0.62, 0.08, 2), 0.015, 3, 2)),
     mat: () => marshmallow('#ffffff'),
     colors: ['#ffffff', '#ffe3f0', '#fff3fa', '#f6e8ff'],
     spacing: 0.7,
@@ -164,7 +165,7 @@ const STYLES: Record<RegionId, PaverStyle> = {
     layout: 'planks',
   },
   woods: {
-    geo: () => cachedGeo('paver-chip', () => lumpy(puckGeometry(0.28, 0.09, 12, 0.6), 0.03, 4, 5)),
+    geo: () => cachedGeo('paver-chip', () => lumpy(puckGeometry(0.28, 0.09, 12, 0.6, 9), 0.03, 4, 5)),
     mat: () => gloss('#ffffff', 0.35, 0.5),
     colors: ['#5b3520', '#6e4228', '#4a2a18'],
     spacing: 0.7,
@@ -186,6 +187,7 @@ const STYLES: Record<RegionId, PaverStyle> = {
 function PaverSet({ region }: { region: RegionId }) {
   const style = STYLES[region];
   const ref = useRef<THREE.InstancedMesh>(null!);
+  useDistanceCull(ref, 55);
   const items = useMemo(() => {
     const rng = mulberry32(region.length * 97 + 13);
     const out: { m: THREE.Matrix4; c: THREE.Color }[] = [];

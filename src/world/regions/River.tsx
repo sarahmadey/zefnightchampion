@@ -81,7 +81,7 @@ function Fizz() {
     });
     ref.current.instanceMatrix.needsUpdate = true;
   });
-  return <instancedMesh ref={ref} args={[cachedGeo('bubble-sphere', () => new THREE.SphereGeometry(1, 20, 14)), mat, count]} frustumCulled={false} raycast={() => null} />;
+  return <instancedMesh ref={ref} args={[cachedGeo('bubble-sphere', () => new THREE.SphereGeometry(1, 14, 10)), mat, count]} frustumCulled={false} raycast={() => null} />;
 }
 
 export function lemonBoatGeometry() {
@@ -184,13 +184,13 @@ function LicoriceBridge() {
             railPts.push([p.x + r.x * side * 1.25, p.y + 0.9, p.z + r.z * side * 1.25]);
             archPts.push([p.x + r.x * side * 1.2, p.y - 0.25, p.z + r.z * side * 1.2]);
           }
-          const rail = twistRope(curveFrom(railPts), 0.08, 18, 90);
+          const rail = twistRope(curveFrom(railPts), 0.08, 18, 60);
           paint(rail, '#e3182f');
           parts.push(rail);
-          const rail2 = twistRope(curveFrom(railPts.map(([x, y, z]) => [x, y - 0.35, z] as [number, number, number])), 0.06, 14, 90);
+          const rail2 = twistRope(curveFrom(railPts.map(([x, y, z]) => [x, y - 0.35, z] as [number, number, number])), 0.06, 14, 50);
           paint(rail2, '#c3112a');
           parts.push(rail2);
-          const arch = twistRope(curveFrom(archPts), 0.13, 12, 80);
+          const arch = twistRope(curveFrom(archPts), 0.13, 12, 50);
           paint(arch, '#b50f26');
           parts.push(arch);
           for (let s = s0 - 0.6; s <= s1 + 0.61; s += 1.2) {
@@ -218,7 +218,7 @@ function reedGeometry() {
   return cachedGeo('candy-reed', () => {
     const stick = new THREE.CylinderGeometry(0.04, 0.05, 1.4, 8);
     stick.translate(0, 0.7, 0);
-    const top = gumdropGeometry(12);
+    const top = gumdropGeometry(10, 8);
     top.scale(0.18, 0.28, 0.18);
     top.translate(0, 1.38, 0);
     paint(stick, (p) => (Math.floor(p.y * 6) % 2 === 0 ? new THREE.Color('#ffffff') : new THREE.Color('#ffd21f')));
@@ -252,17 +252,17 @@ export function River() {
       <Fizz />
       <DriftingBoats />
       <LicoriceBridge />
-      <InstancedSet geometry={reedGeometry()} material={vcolor(0.4, 'reed')} items={reeds} />
+      <InstancedSet geometry={reedGeometry()} material={vcolor(0.4, 'reed')} items={reeds} maxDist={50} />
       {['#ffe14d', '#ffd21f', '#fff3a0'].map((c) => (
         <InstancedSet
           key={c}
           geometry={gumdropGeometry()}
           material={jelly(c, 0.9)}
           items={bushes.filter((b) => b.color === c).map((b) => ({ ...b, color: undefined }))}
-          castShadow
+          maxDist={70}
         />
       ))}
-      <InstancedSet geometry={cachedGeo('lemon-pad', () => lemonSliceGeometry(0.6, 0.08, 10))} material={vcolorGloss(0.35, 0.6)} items={pads} />
+      <InstancedSet geometry={cachedGeo('lemon-pad', () => lemonSliceGeometry(0.6, 0.08, 10, 40, 12))} material={vcolorGloss(0.35, 0.6)} items={pads} maxDist={60} />
       {pads.slice(0, 3).map((p, i) => (
         <Wobbly key={i} position={[p.pos.x, p.pos.y, p.pos.z]} sound="bloop" particles="bubble" hit={0.7} hitOffset={[0, 0.1, 0]}>
           <group />

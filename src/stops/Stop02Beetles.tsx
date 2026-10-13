@@ -7,8 +7,8 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { StopFrame, useStop } from './common';
 import { STOP_DEFS } from '../world/stopDefs';
-import { cachedGeo, capsuleRadius, curveFrom, extrude, starShape, tube } from '../three/geometry';
-import { gloss, matte, vcolor } from '../three/materials';
+import { cachedGeo, capsuleRadius, curveFrom, extrude, merge, paint, starShape, tube } from '../three/geometry';
+import { gloss, matte, vcolor, vcolorGloss } from '../three/materials';
 import { HintHand } from '../three/bits';
 import { burst } from '../three/Particles';
 import { sfx } from '../audio/sfx';
@@ -54,11 +54,68 @@ interface BeetleState {
   wiggle: number;
 }
 
+/** One merged, vertex-coloured mesh for a beetle's body, head, eyes and shine. */
+function beetleBodyGeometry(color: string) {
+  return cachedGeo(`beetle-body-${color}`, () => {
+    const bean = paint(beanGeometry().clone(), color);
+    const head = new THREE.SphereGeometry(0.1, 12, 9);
+    head.translate(0, 0.2, 0.24);
+    paint(head, '#3a1e14');
+    const parts: THREE.BufferGeometry[] = [bean, head];
+    for (const sx of [-1, 1]) {
+      const white = new THREE.SphereGeometry(0.032, 8, 6);
+      white.translate(0.045 * sx, 0.24, 0.32);
+      const pupil = new THREE.SphereGeometry(0.016, 6, 5);
+      pupil.translate(0.045 * sx, 0.24, 0.342);
+      parts.push(paint(white, '#ffffff'), paint(pupil, '#111111'));
+    }
+    const shine = new THREE.SphereGeometry(0.025, 6, 5);
+    shine.scale(1, 0.6, 1.6);
+    shine.translate(0.07, 0.33, 0.02);
+    parts.push(paint(shine, '#ffffff'));
+    return merge(parts);
+  });
+}
+
+function antennaePairGeometry() {
+  return cachedGeo('beetle-antennae', () => {
+    const parts: THREE.BufferGeometry[] = [];
+    for (const sx of [-1, 1]) {
+      const a = antennaGeometry().clone();
+      a.scale(sx, 1, 1);
+      a.rotateX(-0.2);
+      a.rotateZ(sx * 0.3);
+      a.translate(0.04 * sx, 0.28, 0.28);
+      parts.push(a);
+    }
+    return paint(merge(parts), '#3a1e14');
+  });
+}
+
+/** Three legs that move together (a tripod): front+back on one side, middle on the other. */
+function tripodGeometry(which: 0 | 1) {
+  return cachedGeo(`beetle-tripod-${which}`, () => {
+    const parts: THREE.BufferGeometry[] = [];
+    for (let i = 0; i < 6; i++) {
+      const side = i < 3 ? 1 : -1;
+      const k = i % 3;
+      const inSet = ((k === 1 ? 1 : 0) ^ (side > 0 ? 0 : 1)) === which;
+      if (!inSet) continue;
+      const leg = legGeometry().clone();
+      leg.scale(side, 1, 1);
+      leg.translate(0.12 * side, 0.1, -0.1 + k * 0.1);
+      parts.push(leg);
+    }
+    return paint(merge(parts), '#3a1e14');
+  });
+}
+
 function Beetle({ color, st }: { color: string; st: BeetleState }) {
   const g = useRef<THREE.Group>(null!);
   const body = useRef<THREE.Group>(null!);
-  const legs = useRef<(THREE.Group | null)[]>([]);
-  const ants = useRef<(THREE.Mesh | null)[]>([]);
+  const legsA = useRef<THREE.Mesh>(null!);
+  const legsB = useRef<THREE.Mesh>(null!);
+  const ants = useRef<THREE.Mesh>(null!);
   useFrame((state) => {
     const t = state.clock.elapsedTime;
     g.current.position.copy(st.pos);
@@ -66,53 +123,18 @@ function Beetle({ color, st }: { color: string; st: BeetleState }) {
     body.current.position.y = st.hop;
     body.current.rotation.x = st.flip;
     const walking = st.mode === 'parade' || st.mode === 'join' || st.mode === 'home';
-    legs.current.forEach((l, i) => {
-      if (!l) return;
-      const side = i < 3 ? 1 : -1;
-      const k = i % 3;
-      const swing = walking ? Math.sin(st.stepPhase + k * 2.1 + (side > 0 ? 0 : Math.PI)) * 0.5 : 0;
-      l.rotation.set(0, swing, walking ? 0 : -0.3 * side);
-    });
-    ants.current.forEach((a, i) => {
-      if (a) a.rotation.set(Math.sin(t * 6 + i) * 0.2 * st.wiggle - 0.2, 0, (i ? -1 : 1) * 0.3);
-    });
+    const sw = walking ? Math.sin(st.stepPhase) : 0;
+    legsA.current.position.set(0, Math.max(0, sw) * 0.03, sw * 0.04);
+    legsB.current.position.set(0, Math.max(0, -sw) * 0.03, -sw * 0.04);
+    ants.current.rotation.x = Math.sin(t * 6) * 0.15 * st.wiggle;
   });
-  const legGeo = legGeometry();
   return (
     <group ref={g}>
       <group ref={body}>
-        <mesh geometry={beanGeometry()} material={gloss(color, 0.12, 1)} castShadow />
-        <mesh material={gloss('#3a1e14', 0.3, 0.6)} position={[0, 0.2, 0.24]}>
-          <sphereGeometry args={[0.1, 14, 10]} />
-        </mesh>
-        {[-1, 1].map((sx) => (
-          <group key={sx} position={[0.045 * sx, 0.24, 0.32]}>
-            <mesh material={matte('#ffffff', 0.3)}>
-              <sphereGeometry args={[0.032, 10, 8]} />
-            </mesh>
-            <mesh material={matte('#111111', 0.3)} position={[0, 0, 0.022]}>
-              <sphereGeometry args={[0.016, 8, 6]} />
-            </mesh>
-          </group>
-        ))}
-        {[-1, 1].map((sx, i) => (
-          <group key={`a${sx}`} position={[0.04 * sx, 0.28, 0.28]}>
-            <mesh ref={(m) => (ants.current[i] = m)} geometry={antennaGeometry()} material={matte('#3a1e14', 0.5)} scale={[sx, 1, 1]} />
-          </group>
-        ))}
-        {/* shiny highlight dots on the jellybean shell */}
-        <mesh material={matte('#ffffff', 0.2)} position={[0.07, 0.33, 0.02]} scale={[1, 0.6, 1.6]}>
-          <sphereGeometry args={[0.025, 8, 6]} />
-        </mesh>
-        {Array.from({ length: 6 }, (_, i) => {
-          const side = i < 3 ? 1 : -1;
-          const k = i % 3;
-          return (
-            <group key={i} ref={(l) => (legs.current[i] = l)} position={[0.12 * side, 0.1, -0.1 + k * 0.1]}>
-              <mesh geometry={legGeo} material={matte('#3a1e14', 0.6)} scale={[side, 1, 1]} />
-            </group>
-          );
-        })}
+        <mesh geometry={beetleBodyGeometry(color)} material={vcolorGloss(0.12, 1)} castShadow />
+        <mesh ref={ants} geometry={antennaePairGeometry()} material={vcolor(0.5, 'beetle-dark')} />
+        <mesh ref={legsA} geometry={tripodGeometry(0)} material={vcolor(0.5, 'beetle-dark')} />
+        <mesh ref={legsB} geometry={tripodGeometry(1)} material={vcolor(0.5, 'beetle-dark')} />
       </group>
     </group>
   );

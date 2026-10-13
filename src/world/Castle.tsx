@@ -282,7 +282,7 @@ function windowGeometry() {
     s.lineTo(0.21, 0.1);
     s.absarc(0, 0.1, 0.21, 0, Math.PI, false);
     s.lineTo(-0.21, -0.32);
-    return extrude(s, 0.05, 0.015, 10);
+    return extrude(s, 0.05, 0, 5);
   });
 }
 

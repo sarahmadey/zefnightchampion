@@ -99,6 +99,7 @@ export function Balloon() {
   });
 
   const fly = (u: number) => {
+    if (!g.current) return;
     st.flying = true;
     st.u = u;
     const p = path.getPointAt(u);

@@ -1,0 +1,25 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 900, height: 650 }, deviceScaleFactor: 1 });
+const logs = [];
+page.on('console', (m) => { const t = m.text(); if (!/vite|DevTools|THREE.Clock/.test(t)) logs.push(`[${m.type()}] ${t}`); });
+page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
+await page.addInitScript(() => localStorage.setItem('zefs-dry-night-quest:welcomed', '1'));
+await page.goto('http://127.0.0.1:5173/?debug&speed=1.5', { waitUntil: 'load' });
+await page.waitForTimeout(4000);
+await page.evaluate(() => {
+  const z = window.__zef;
+  z.recordRun(15, -1);
+  z.record(0, 'wet');
+  const d = z.save();
+  localStorage.setItem('zefs-dry-night-quest:v1', JSON.stringify({ ...d, seen: { stop: 0, hugDate: Object.keys(d.records).sort().pop(), streak: 0 } }));
+});
+logs.push('---- reload');
+await page.reload({ waitUntil: 'load' });
+await page.waitForTimeout(7000);
+logs.push('---- tap balloon');
+const bal = await page.evaluate(() => window.__zef.localScreen(0, -4.4, 2.6, 2.6));
+await page.mouse.click(bal.x, bal.y);
+await page.waitForTimeout(5000);
+console.log(logs.join('\n'));
+await browser.close();

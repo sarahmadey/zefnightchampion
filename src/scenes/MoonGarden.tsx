@@ -12,6 +12,7 @@ import { cachedGeo, cuppedPetal, curveFrom, lollipopDisc, puffGeometry, tube, tw
 import { emissive, gloss, marshmallow, matte, pattern } from '../three/materials';
 import { makeFlowMaterial, makeSkyMaterial } from '../three/shaders';
 import { Glow } from '../three/bits';
+import { SceneEnv } from '../three/SceneEnv';
 import { burst } from '../three/Particles';
 import { sfx } from '../audio/sfx';
 import { frameDt, pipReact, zef, zefPlay } from '../game/actors';
@@ -35,7 +36,7 @@ export const GARDEN: RoomSpec = {
 
 const POND = new THREE.Vector3(-3.6, 0, -2.2);
 const SWING = new THREE.Vector3(3.8, 0, -3.6);
-const MOON_POS = new THREE.Vector3(-5, 8.5, -22);
+const MOON_POS = new THREE.Vector3(-5.5, 7.0, -22);
 
 function NightSky() {
   const mat = useMemo(
@@ -429,8 +430,7 @@ export function MoonGarden() {
   };
   return (
     <group>
-      <color attach="background" args={['#120f33']} />
-      <fog attach="fog" args={['#1b1440', 20, 70]} />
+      <SceneEnv background="#120f33" fog={{ color: '#1b1440', near: 20, far: 70 }} />
       <NightSky />
       <Moon />
       <hemisphereLight args={['#8fa8ff', '#2a1d4a', 1.0]} />

@@ -151,7 +151,7 @@ function FloatingClouds() {
   return (
     <group>
       {groups.map((set, v) => (
-        <instancedMesh key={v} ref={refs[v]} args={[cloudPlatformGeometry(v), marshmallowVC(), Math.max(1, set.length)]} castShadow frustumCulled={false} raycast={() => null} />
+        <instancedMesh key={v} ref={refs[v]} args={[cloudPlatformGeometry(v), marshmallowVC(), Math.max(1, set.length)]} frustumCulled={false} raycast={() => null} />
       ))}
     </group>
   );
@@ -193,7 +193,7 @@ function DriftingBubbles() {
     ref.current.instanceMatrix.needsUpdate = true;
   });
   return (
-    <instancedMesh ref={ref} args={[cachedGeo('bubble-sphere', () => new THREE.SphereGeometry(1, 20, 14)), mat, count]} frustumCulled={false} raycast={() => null} renderOrder={2} />
+    <instancedMesh ref={ref} args={[cachedGeo('bubble-sphere', () => new THREE.SphereGeometry(1, 14, 10)), mat, count]} frustumCulled={false} raycast={() => null} renderOrder={2} />
   );
 }
 
@@ -223,9 +223,9 @@ export function Meadow() {
   return (
     <group>
       {trees.map((items, v) => (
-        <InstancedSet key={v} geometry={cottonTreeGeometry(v)} material={treeMat} items={items} castShadow />
+        <InstancedSet key={v} geometry={cottonTreeGeometry(v)} material={treeMat} items={items} maxDist={90} />
       ))}
-      <InstancedSet geometry={cachedGeo('fluff-tuft', () => xform(puffGeometry(17, 4, 0.5, 2), { pos: [0, 0.15, 0] }))} material={marshmallow('#ffffff')} items={tufts} />
+      <InstancedSet geometry={cachedGeo('fluff-tuft', () => xform(puffGeometry(17, 4, 0.5, 1), { pos: [0, 0.15, 0] }))} material={marshmallow('#ffffff')} items={tufts} maxDist={45} />
       <FloatingClouds />
       <DriftingBubbles />
       {windmills.map((w, i) => (

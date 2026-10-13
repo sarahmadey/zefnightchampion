@@ -213,7 +213,7 @@ export function Stop09Whale() {
         </group>
       ))}
       <group ref={whale} visible={false} onPointerDown={tapWhale}>
-        <instancedMesh ref={whaleInst} args={[cachedGeo('bubble-sphere', () => new THREE.SphereGeometry(1, 20, 14)), whaleMat, specs.length]} renderOrder={3} frustumCulled={false} />
+        <instancedMesh ref={whaleInst} args={[cachedGeo('bubble-sphere', () => new THREE.SphereGeometry(1, 14, 10)), whaleMat, specs.length]} renderOrder={3} frustumCulled={false} />
         {/* a solid, friendly face so the whale reads clearly */}
         <mesh material={gloss('#ffe9a8', 0.3, 0.5)} position={[0, -0.05, 0.2]} scale={[1.0, 0.82, 1.35]}>
           <sphereGeometry args={[0.85, 24, 18]} />

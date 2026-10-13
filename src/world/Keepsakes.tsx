@@ -28,6 +28,7 @@ import { setFocus } from '../game/world';
 import { walkRoute } from '../game/nav';
 import { Spring, TAU } from '../three/util';
 import { lemonBoatGeometry } from './regions/River';
+import { useDistanceCull } from './decor';
 import { peppermintSailGeometry } from './regions/Meadow';
 
 const SHELF_LOCAL: [number, number, number] = [4.1, 0, 3.0];
@@ -39,13 +40,13 @@ const CELL_H = 0.62;
 export function shelfWorld() {
   const p = stopLocalToWorld(0, SHELF_LOCAL);
   const f = stopFrame(0);
-  const camLocal: [number, number, number] = [SHELF_LOCAL[0] - 3.4, 2.0, SHELF_LOCAL[2] - 3.2];
+  const camLocal: [number, number, number] = [SHELF_LOCAL[0] - 3.2, 2.5, SHELF_LOCAL[2] - 3.0];
   return {
     pos: p,
     yaw: f.yaw + Math.atan2(camLocal[0] - SHELF_LOCAL[0], camLocal[2] - SHELF_LOCAL[2]),
     cam: stopLocalToWorld(0, camLocal),
     look: stopLocalToWorld(0, [SHELF_LOCAL[0], 1.15, SHELF_LOCAL[2]]),
-    zefSpot: stopLocalToWorld(0, [SHELF_LOCAL[0] - 1.5, 0, SHELF_LOCAL[2] - 1.4]),
+    zefSpot: stopLocalToWorld(0, [SHELF_LOCAL[0] - 2.3, 0, SHELF_LOCAL[2] - 0.5]),
   };
 }
 
@@ -320,8 +321,10 @@ export function KeepsakeShelf() {
   const journey = useJourney();
   const w = useMemo(() => shelfWorld(), []);
   const W = COLS * CELL_W + 0.2;
+  const ref = useRef<THREE.Group>(null);
+  useDistanceCull(ref, 45, w.pos, 2);
   return (
-    <group position={w.pos} rotation={[0, w.yaw, 0]}>
+    <group ref={ref} position={w.pos} rotation={[0, w.yaw, 0]}>
       <mesh geometry={cabinetGeometry()} material={vcolor(0.65, 'cabinet')} castShadow receiveShadow />
       {Array.from({ length: 15 }, (_, i) => {
         const id = i + 1;

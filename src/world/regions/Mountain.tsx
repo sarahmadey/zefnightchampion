@@ -115,12 +115,12 @@ export function Mountain() {
   return (
     <group>
       {gums.map((items, i) => (
-        <InstancedSet key={i} geometry={gumdropGeometry(32)} material={jelly(GUM_COLORS[i], 0.8)} items={items} castShadow />
+        <InstancedSet key={i} geometry={gumdropGeometry(20)} material={jelly(GUM_COLORS[i], 0.8)} items={items} maxDist={110} />
       ))}
       {crystals.map((items, v) => (
-        <InstancedSet key={v} geometry={crystalClusterGeometry(v)} material={crystalMat} items={items} />
+        <InstancedSet key={v} geometry={crystalClusterGeometry(v)} material={crystalMat} items={items} maxDist={70} />
       ))}
-      <InstancedSet geometry={rockCandyGeometry()} material={jelly('#d7c4ff', 0.88)} items={spires} castShadow />
+      <InstancedSet geometry={rockCandyGeometry()} material={jelly('#d7c4ff', 0.88)} items={spires} />
       <InstancedSet geometry={lanternPostGeometry()} material={pattern({ a: '#ffffff', b: '#b197fc', mode: 'helix', freq: 1, twist: 6 })} items={posts} />
       {lanterns.map((l, i) => (
         <Wobbly key={i} position={[l.pos.x, l.pos.y + 1.75, l.pos.z]} sound="chime" soundArg={i % 8} particles="sparkle" particleColors={[l.color, '#ffffff']} hit={0.5}>

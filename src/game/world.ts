@@ -37,12 +37,14 @@ export function focusCamera(i: number) {
   cam.pos.copy(w.cam);
   cam.target.copy(w.look);
   cam.fitWidth = STOP_DEFS[i].fit;
+  cam.focusObject = i === 14 ? null : w.object.clone();
   cam.lambda = 2.4;
 }
 
 export function followCamera() {
   cam.mode = 'follow';
   cam.fitWidth = 0;
+  cam.focusObject = null;
   cam.lambda = 2.6;
 }
 

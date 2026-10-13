@@ -126,6 +126,8 @@ export const cam = {
   lambda: 2.6,
   /** subject width that should fit horizontally (focus shots on narrow screens) */
   fitWidth: 0,
+  /** the surprise being framed; portrait screens centre on it */
+  focusObject: null as THREE.Vector3 | null,
   /** jump directly to goal on next frame */
   snap: false,
   /** extra field-of-view multiplier for dramatic shots */

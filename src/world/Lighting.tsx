@@ -5,8 +5,10 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { zef } from '../game/actors';
 import { SKY } from './Sky';
+import { SceneEnv } from '../three/SceneEnv';
+import { quality } from '../game/quality';
 
-export function WorldLights({ shadowSize = 2048 }: { shadowSize?: number }) {
+export function WorldLights({ shadowSize = quality.shadowSize }: { shadowSize?: number }) {
   const light = useRef<THREE.DirectionalLight>(null!);
   const target = useMemo(() => new THREE.Object3D(), []);
   useFrame(() => {
@@ -27,7 +29,7 @@ export function WorldLights({ shadowSize = 2048 }: { shadowSize?: number }) {
         ref={light}
         intensity={2.5}
         color="#fff0d6"
-        castShadow
+        castShadow={quality.shadows}
         target={target}
         shadow-mapSize={[shadowSize, shadowSize]}
         shadow-camera-left={-17}
@@ -41,7 +43,7 @@ export function WorldLights({ shadowSize = 2048 }: { shadowSize?: number }) {
         shadow-radius={3}
       />
       <primitive object={target} />
-      <fogExp2 attach="fog" args={[SKY.fog, 0.0042]} />
+      <SceneEnv background={SKY.horizon} fog={{ color: SKY.fog, density: 0.0042 }} />
     </>
   );
 }

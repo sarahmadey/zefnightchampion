@@ -180,7 +180,7 @@ export function PathLights({ lit, onTap }: { lit: number; onTap: (i: number, awa
   const petalGeo = useMemo(
     () =>
       cachedGeo('lamp-petal', () => {
-        const g = cuppedPetal(0.42, 0.17, 0.08, 0.02);
+        const g = cuppedPetal(0.42, 0.17, 0.08, 0.02, 5);
         // pivot at the base, petal grows along +y then bends outward when tilted
         return g;
       }),
@@ -192,7 +192,7 @@ export function PathLights({ lit, onTap }: { lit: number; onTap: (i: number, awa
   return (
     <group>
       <instancedMesh ref={posts} args={[cachedGeo('lamp-post', () => new THREE.CylinderGeometry(0.07, 0.08, POST_H, 12).translate(0, POST_H / 2, 0)), postMat, count]} castShadow />
-      <instancedMesh ref={bases} args={[cachedGeo('lamp-base', () => pipedSwirl({ radius: 0.32, height: 0.3, thickness: 0.11, turns: 2.2 })), matte('#ffffff', 0.5), count]} />
+      <instancedMesh ref={bases} args={[cachedGeo('lamp-base', () => pipedSwirl({ radius: 0.32, height: 0.3, thickness: 0.11, turns: 1.6 })), matte('#ffffff', 0.5), count]} />
       <instancedMesh ref={petals} args={[petalGeo, matte('#ffffff', 0.45), count * PETALS]} frustumCulled={false} />
       <instancedMesh ref={bulbs} args={[cachedGeo('lamp-bulb', () => new THREE.SphereGeometry(0.17, 16, 12)), bulbMat, count]} frustumCulled={false} />
       <points geometry={glowGeo} material={glowMat} frustumCulled={false} />

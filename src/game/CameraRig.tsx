@@ -21,6 +21,7 @@ export function viewFov(aspect: number): number {
 }
 
 const tmpF = new THREE.Vector3();
+const toCastle = new THREE.Vector3();
 const goalPos = new THREE.Vector3();
 const goalTarget = new THREE.Vector3();
 const dir = new THREE.Vector3();
@@ -30,16 +31,17 @@ export function followGoal(aspect: number, outPos: THREE.Vector3, outTarget: THR
   tangentAt(zef.s + 3, tmpF);
   tmpF.y = 0;
   tmpF.normalize();
-  // lean the view toward the castle (−z) so it stays on screen
-  tmpF.lerp(new THREE.Vector3(0, 0, -1), 0.45).normalize();
+  // lean the view toward the castle so it stays on screen (more so on narrow phones)
   const k = smoothstep(0.5, 1.6, aspect);
+  toCastle.set(0 - zef.pos.x, 0, -153 - zef.pos.z).normalize();
+  tmpF.lerp(toCastle, lerp(0.72, 0.45, k)).normalize();
   // near the start the cottage sits right behind Zef: stay in front of it
-  const dist = Math.min(lerp(5.6, 6.6, k), Math.max(2.6, zef.s - 0.6));
-  const height = lerp(3.3, 2.9, k) + Math.max(0, 5.5 - dist) * 0.25;
+  const dist = Math.min(lerp(5.6, 6.4, k), Math.max(2.8, zef.s - 0.6));
+  const height = dist * lerp(0.56, 0.48, k);
   outPos.copy(zef.pos).addScaledVector(tmpF, -dist);
   outPos.y = zef.pos.y + height;
-  outTarget.copy(zef.pos).addScaledVector(tmpF, 4.2);
-  outTarget.y = zef.pos.y + 1.05;
+  outTarget.copy(zef.pos).addScaledVector(tmpF, 3.0);
+  outTarget.y = zef.pos.y + 0.95;
 }
 
 export function CameraRig() {
@@ -48,6 +50,8 @@ export function CameraRig() {
   const scene = useGame((s) => s.scene);
   const cur = useRef({ pos: new THREE.Vector3(0, 4, 14), target: new THREE.Vector3(0, 1, 0), init: false, t: 0 });
   const gl = useThree((s) => s.gl);
+  const sceneObj = useThree((s) => s.scene);
+  (window as unknown as { __scene?: THREE.Scene }).__scene = sceneObj;
   (window as unknown as { __camera?: THREE.Camera; __renderer?: THREE.WebGLRenderer }).__camera = camera;
   (window as unknown as { __renderer?: THREE.WebGLRenderer }).__renderer = gl;
 
@@ -69,10 +73,20 @@ export function CameraRig() {
       goalTarget.copy(cam.target);
     }
 
-    // pull back so a subject of width `fitWidth` fits a narrow screen
-    if (cam.fitWidth > 0) {
+    // on tall phone screens, centre the surprise itself and frame it tighter
+    const portrait = aspect < 0.8;
+    let fit = cam.fitWidth;
+    if (portrait && cam.mode === 'focus' && cam.focusObject) {
+      const shift = goalTarget.clone().lerp(cam.focusObject, 0.55);
+      shift.y = Math.max(shift.y, cam.focusObject.y + 0.6);
+      goalPos.add(shift.clone().sub(goalTarget).multiplyScalar(0.6));
+      goalTarget.copy(shift);
+      fit *= 0.62;
+    }
+    // pull back so a subject of width `fit` fits a narrow screen
+    if (fit > 0) {
       const hfov = 2 * Math.atan(Math.tan((camera.fov * DEG) / 2) * aspect);
-      const need = cam.fitWidth / 2 / Math.tan(hfov / 2);
+      const need = fit / 2 / Math.tan(hfov / 2);
       dir.copy(goalPos).sub(goalTarget);
       const d = dir.length();
       if (d < need) goalPos.copy(goalTarget).addScaledVector(dir.normalize(), need);

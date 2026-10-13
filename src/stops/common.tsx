@@ -10,12 +10,18 @@ import { stopFrame } from '../game/route';
 import { requestStopInteraction } from '../game/world';
 import { bus } from '../game/bus';
 import { frameDt } from '../game/actors';
+import { useDistanceCull } from '../world/decor';
 
-/** Children use the stop's local frame: +x right of the path, -z forward. */
-export function StopFrame({ id, children }: { id: number; children: ReactNode }) {
+/**
+ * Children use the stop's local frame: +x right of the path, -z forward.
+ * Far-away stops are hidden (they'd be lost in the haze) to keep phones fast.
+ */
+export function StopFrame({ id, children, cull = 70 }: { id: number; children: ReactNode; cull?: number }) {
   const f = useMemo(() => stopFrame(id), [id]);
+  const ref = useRef<THREE.Group>(null);
+  useDistanceCull(ref, cull, f.origin, 6);
   return (
-    <group position={f.origin} rotation={[0, f.yaw, 0]}>
+    <group ref={ref} position={f.origin} rotation={[0, f.yaw, 0]}>
       {children}
     </group>
   );

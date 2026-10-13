@@ -34,7 +34,7 @@ export const STOP_DEFS: StopDef[] = [
     cam: [-3.6, 2.7, -6.2],
     look: [0.2, 1.6, 3.4],
     fit: 9,
-    light: [2.2, 1.2],
+    light: [-1.9, -0.8],
   },
   {
     id: 1,

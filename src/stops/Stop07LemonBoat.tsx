@@ -53,7 +53,7 @@ export function Stop07LemonBoat() {
   const s = useStop(ID);
   const d = STOP_DEFS[ID];
   const [ox, , oz] = d.object;
-  const home = useMemo(() => localToWorld(ID, [ox, 0, oz + 1.1]).setY(WATER_Y + 0.08), [ox, oz]);
+  const home = useMemo(() => localToWorld(ID, [ox, 0, oz - 0.7]).setY(WATER_Y + 0.08), [ox, oz]);
   const nearSign = useMemo(() => {
     const z = localToWorld(ID, [d.zef[0], 0, d.zef[1]]);
     return -Math.sign(acrossRiver(z, 1).k || 1);

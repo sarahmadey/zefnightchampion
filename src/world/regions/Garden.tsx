@@ -14,6 +14,7 @@ import {
   paint,
   pipedSwirl,
   strawberryGeometry,
+  miniStrawberryGeometry,
   tube,
   flowRibbon,
   xform,
@@ -37,7 +38,7 @@ export function strawberryPlantGeometry(variant: number) {
     const leaves = 5 + variant;
     for (let i = 0; i < leaves; i++) {
       const a = (i / leaves) * TAU + rng() * 0.4;
-      const leaf = cuppedPetal(1.1 + rng() * 0.4, 0.45, -0.18, 0.03);
+      const leaf = cuppedPetal(1.1 + rng() * 0.4, 0.45, -0.18, 0.03, 6);
       leaf.rotateX(-0.9 - rng() * 0.3);
       leaf.rotateY(-a + Math.PI / 2);
       leaf.translate(Math.cos(a) * 0.15, 0.05, Math.sin(a) * 0.15);
@@ -62,7 +63,7 @@ export function strawberryPlantGeometry(variant: number) {
       parts.push(stem);
       const tip = new THREE.Vector3(...pts[4]);
       const berryScale = 1.15 + rng() * 0.45;
-      const berry = strawberryGeometry(70 + variant * 3 + k, 50);
+      const berry = strawberryGeometry(70 + variant * 3 + k, 34);
       berry.rotateX(Math.PI); // hang upside down: the calyx at the top
       berry.scale(berryScale, berryScale, berryScale);
       berry.translate(tip.x, tip.y - 0.62 * berryScale, tip.z);
@@ -76,7 +77,7 @@ export function strawberryPlantGeometry(variant: number) {
       parts.push(fstem);
       for (let i = 0; i < 5; i++) {
         const a = (i / 5) * TAU;
-        const p = cuppedPetal(0.32, 0.2, 0.05, 0.02);
+        const p = cuppedPetal(0.32, 0.2, 0.05, 0.02, 5);
         p.rotateX(-Math.PI / 2 + 0.35);
         p.rotateY(-a);
         p.translate(-0.35, fh + 0.02, 0.15);
@@ -96,7 +97,7 @@ export function strawberryPlantGeometry(variant: number) {
 /** Single giant strawberries sitting in the grass. */
 function groundBerryGeometry() {
   return cachedGeo('ground-berry', () => {
-    const g = strawberryGeometry(91, 60);
+    const g = strawberryGeometry(91, 34);
     g.translate(0, 0.62, 0);
     return g;
   });
@@ -140,11 +141,11 @@ export function cakeGeometry(tiers: number, r0: number, seed: number) {
       paint(drips, cream === '#ffffff' ? '#ffffff' : '#ffd1e3');
       parts.push(drips);
       // berries and rosettes around the rim
-      const n = Math.round(r * 4);
+      const n = Math.max(4, Math.round(r * 2.6));
       for (let i = 0; i < n; i++) {
         const a = (i / n) * TAU + rng() * 0.2;
         if (i % 2 === 0) {
-          const b = strawberryGeometry(200 + i, 24);
+          const b = miniStrawberryGeometry();
           b.scale(0.32, 0.32, 0.32);
           b.translate(Math.cos(a) * r * 0.78, y + h + 0.2, Math.sin(a) * r * 0.78);
           parts.push(b);
@@ -157,7 +158,7 @@ export function cakeGeometry(tiers: number, r0: number, seed: number) {
       }
       y += h + 0.04;
     }
-    const top = strawberryGeometry(seed + 300, 40);
+    const top = strawberryGeometry(seed + 300, 30);
     top.scale(0.9, 0.9, 0.9);
     top.translate(0, y + 0.55, 0);
     parts.push(top);
@@ -172,22 +173,23 @@ function flowerGeometry(color: string, key: number) {
     const stem = tube(curveFrom([[0, 0, 0], [0.04, h * 0.5, 0], [0, h, 0.02]]), { segments: 8, radial: 5, radius: () => 0.025 });
     paint(stem, '#46b04f');
     parts.push(stem);
-    const leaf = cuppedPetal(0.22, 0.1, -0.03, 0.012);
+    const leaf = cuppedPetal(0.22, 0.1, -0.03, 0.012, 4);
     leaf.rotateZ(-0.9);
     leaf.translate(0.02, 0.15, 0);
     paint(leaf, LEAF);
     parts.push(leaf);
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU;
-      const p = cuppedPetal(0.16, 0.1, 0.03, 0.015);
+      const p = cuppedPetal(0.16, 0.1, 0.03, 0.015, 4);
       p.rotateX(-Math.PI / 2 + 0.5);
       p.rotateY(-a);
       p.translate(0, h, 0.02);
       paint(p, color);
       parts.push(p);
     }
-    const c = pipedSwirl({ radius: 0.06, height: 0.06, thickness: 0.03, turns: 1.6 });
-    c.translate(0, h + 0.01, 0.02);
+    const c = new THREE.SphereGeometry(0.05, 8, 6);
+    c.scale(1, 0.6, 1);
+    c.translate(0, h + 0.02, 0.02);
     paint(c, '#fff3b0');
     parts.push(c);
     return merge(parts);
@@ -320,12 +322,12 @@ export function Garden() {
   const flowers = useMemo(
     () =>
       flowerColors.map((_, i) =>
-        scatter({ seed: 40 + i, count: 22, zMin: -30, zMax: 2, minLat: 2.2, maxLat: 14, scale: [0.8, 1.5] }),
+        scatter({ seed: 40 + i, count: 17, zMin: -30, zMax: 2, minLat: 2.2, maxLat: 14, scale: [0.8, 1.5] }),
       ),
     [],
   );
   const swirls = useMemo(
-    () => scatter({ seed: 33, count: 40, zMin: -30, zMax: 4, minLat: 1.9, maxLat: 10, scale: [0.6, 1.2], colors: ['#ffffff', '#ffd1e3', '#fff1b0', '#d7f5ff'] }),
+    () => scatter({ seed: 33, count: 22, zMin: -30, zMax: 4, minLat: 1.9, maxLat: 10, scale: [0.6, 1.2], colors: ['#ffffff', '#ffd1e3', '#fff1b0', '#d7f5ff'] }),
     [],
   );
   const flowerMats = useMemo(() => flowerColors.map((_, i) => swaying(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }), 0.09, `flower${i}`)), []);
@@ -333,21 +335,22 @@ export function Garden() {
   return (
     <group>
       {plants.map((items, v) => (
-        <InstancedSet key={v} geometry={strawberryPlantGeometry(v)} material={plantMat} items={items} castShadow />
+        <InstancedSet key={v} geometry={strawberryPlantGeometry(v)} material={plantMat} items={items} maxDist={60} />
       ))}
-      <InstancedSet geometry={groundBerryGeometry()} material={vcolorGloss(0.25, 0.9)} items={berries} castShadow />
+      <InstancedSet geometry={groundBerryGeometry()} material={vcolorGloss(0.25, 0.9)} items={berries} maxDist={50} />
       {cakes.map((c, i) => (
         <Wobbly key={i} position={[c.pos.x, c.pos.y, c.pos.z]} rotation={[0, c.rot, 0]} sound="boing" soundArg={i} particles="sparkle" strength={0.4} hit={2.4} hitOffset={[0, 1.2, 0]}>
           <mesh geometry={c.geo} material={vcolor(0.6, 'cake')} castShadow receiveShadow />
         </Wobbly>
       ))}
       {flowers.map((items, i) => (
-        <InstancedSet key={i} geometry={flowerGeometry(flowerColors[i], i)} material={flowerMats[i]} items={items} />
+        <InstancedSet key={i} geometry={flowerGeometry(flowerColors[i], i)} material={flowerMats[i]} items={items} maxDist={42} />
       ))}
       <InstancedSet
         geometry={cachedGeo('garden-swirl', () => xform(pipedSwirl({ radius: 0.22, height: 0.28, thickness: 0.09, turns: 2.2 }), { pos: [0, -0.02, 0] }))}
         material={matte('#ffffff', 0.55)}
         items={swirls}
+        maxDist={42}
       />
       <JamStream />
       <JamJar />
