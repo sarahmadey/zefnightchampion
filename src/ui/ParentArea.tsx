@@ -1,7 +1,8 @@
 // Grown-ups only: a hold-to-open button and a simple question guard the
 // parent corner. In here: record or correct any morning, see stars and the
-// underpants meter, set the underpants goal and the prize list, mark prizes
-// as handed over, preview any moment, change the dino, and back up progress.
+// underwear meter, set the underwear goal and the prize list, mark prizes
+// as handed over, preview any moment, change the dino, back up progress, and
+// start over from the very first screen.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -24,7 +25,7 @@ import {
   type NightResult,
 } from '../state/progress';
 import { exportBackup, parseBackup, type SaveData } from '../state/save';
-import { resetBoardView, startPreview } from '../game/director';
+import { resetBoardView, startOver, startPreview } from '../game/director';
 import { sfx } from '../audio/sfx';
 import { setMusicOn, setSoundOn } from '../audio/core';
 import { music } from '../audio/music';
@@ -205,10 +206,10 @@ function consequence(data: SaveData, date: DateKey, result: NightResult | null):
     parts.push(`Stars go from ${before.stars} to ${after.stars} (the board settles quietly, with no "taking away" on screen).`);
   }
   if (result === 'wet' && after.latest?.date === date) {
-    parts.push(`Coach Rex gives ${name} a big hug. The underpants meter starts fresh; all ${after.stars} stars stay.`);
+    parts.push(`Coach Rex gives ${name} a big hug. The underwear meter starts fresh; all ${after.stars} stars stay.`);
   } else if (after.meter !== before.meter) {
-    if (after.goalReachedOn && !before.goalReachedOn && !data.underpants.earned) parts.push('The underpants meter fills up — the Underpants Store opens!');
-    else parts.push(`The underpants meter becomes ${Math.min(after.meter, goal)} of ${goal}.`);
+    if (after.goalReachedOn && !before.goalReachedOn && !data.underpants.earned) parts.push('The underwear meter fills up — the Underwear Store opens!');
+    else parts.push(`The underwear meter becomes ${Math.min(after.meter, goal)} of ${goal}.`);
   }
   if (!parts.length) parts.push('Nothing on the board changes.');
   return parts.join(' ');
@@ -290,7 +291,7 @@ export function ParentPanel() {
 
   const doExport = async () => {
     const text = exportBackup(data);
-    const filename = `dino-underpants-quest-backup-${today}.json`;
+    const filename = `dino-underwear-quest-backup-${today}.json`;
     setExportText(text);
     const viewer = await viewerDownloads();
     if (viewer) {
@@ -405,7 +406,7 @@ export function ParentPanel() {
             <h2>Missing mornings</h2>
             <p>
               No record for {missing.length <= 3 ? missing.map((k) => formatKeyShort(k)).join(', ') : `${missing.length} mornings`} between the last
-              record and today. A missing morning never counts as dry or not dry: it doesn't add a star and doesn't reset the underpants meter. Fill
+              record and today. A missing morning never counts as dry or not dry: it doesn't add a star and doesn't reset the underwear meter. Fill
               them in below if you know.
             </p>
           </section>
@@ -419,7 +420,7 @@ export function ParentPanel() {
               <dd>{q.stars}</dd>
             </div>
             <div>
-              <dt>Underpants meter</dt>
+              <dt>Underwear meter</dt>
               <dd>
                 {Math.min(q.meter, goal)} of {goal}
               </dd>
@@ -435,7 +436,7 @@ export function ParentPanel() {
               </dd>
             </div>
             <div>
-              <dt>Underpants</dt>
+              <dt>Underwear</dt>
               <dd>{data.underpants.earned ? `Earned ${data.underpants.on ? formatKeyShort(data.underpants.on) : ''}${data.underpants.pick !== null ? ` (${UNDERPANTS[data.underpants.pick].name})` : ''}` : 'Not yet'}</dd>
             </div>
             <div>
@@ -449,8 +450,8 @@ export function ParentPanel() {
         </section>
 
         <section className="card">
-          <h2>Underpants goal</h2>
-          <p className="muted small">Dry nights in a row needed to open the Underpants Store.</p>
+          <h2>Underwear goal</h2>
+          <p className="muted small">Dry nights in a row needed to fill the meter and open the Underwear Store. Coach Rex says "twenty nights" when this is 20.</p>
           <div className="row stepper">
             <button className="btn" aria-label="Fewer nights" disabled={goal <= GOAL_MIN} onClick={() => useSave.getState().setGoal(goal - 1)}>
               −
@@ -473,14 +474,14 @@ export function ParentPanel() {
               className="btn small ghost"
               onClick={() =>
                 setConfirm({
-                  title: 'Undo the underpants?',
-                  body: <p>The records no longer reach the goal (maybe a button was pressed by mistake). This puts the Underpants Store back to "not yet".</p>,
+                  title: 'Undo the underwear?',
+                  body: <p>The records no longer reach the goal (maybe a button was pressed by mistake). This puts the Underwear Store back to "not yet".</p>,
                   confirm: 'Undo',
                   onConfirm: () => useSave.getState().undoUnderpants(),
                 })
               }
             >
-              Undo underpants
+              Undo underwear
             </button>
           )}
         </section>
@@ -595,7 +596,7 @@ export function ParentPanel() {
               A prize chest
             </button>
             <button className="btn small" onClick={() => startPreview('store')}>
-              The Underpants Store
+              The Underwear Store
             </button>
             <button className="btn small" onClick={() => startPreview('intro')}>
               Coach Rex's intro
@@ -720,13 +721,13 @@ export function ParentPanel() {
 
         <section className="card danger-zone">
           <h2>Start a new quest</h2>
-          <p className="muted small">Clears every recorded night, the stars, the prizes and the underpants on this device. Keeps the dino, the prize list and the goal.</p>
+          <p className="muted small">Clears every recorded night, the stars, the prizes and the underwear on this device. Keeps the dino, the prize list and the goal.</p>
           <button
             className="btn danger"
             onClick={() =>
               setConfirm({
                 title: 'Start a brand-new quest?',
-                body: <p>All recorded nights, stars, opened chests and the underpants will be cleared. This can't be undone (unless you exported a backup).</p>,
+                body: <p>All recorded nights, stars, opened chests and the underwear will be cleared. This can't be undone (unless you exported a backup).</p>,
                 confirm: 'Start new quest',
                 tone: 'danger',
                 onConfirm: () => {
@@ -739,6 +740,25 @@ export function ParentPanel() {
             }
           >
             Start new quest
+          </button>
+          <h2 className="spaced">Start over from the very beginning</h2>
+          <p className="muted small">
+            Everything goes back to the first screen: the name, picking a dino and a color, and Coach Rex's intro. Clears every recorded night, the stars,
+            the prizes and the underwear. Keeps the prize list, the goal and the sound settings.
+          </p>
+          <button
+            className="btn danger"
+            onClick={() =>
+              setConfirm({
+                title: 'Start over from the very beginning?',
+                body: <p>The name, the dino, every recorded night, the stars, opened chests and the underwear will be cleared, and the game goes back to its first screen. This can't be undone (unless you exported a backup).</p>,
+                confirm: 'Start over',
+                tone: 'danger',
+                onConfirm: () => startOver(),
+              })
+            }
+          >
+            Start over
           </button>
         </section>
 

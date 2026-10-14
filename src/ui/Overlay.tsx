@@ -1,12 +1,12 @@
 // The HTML layer over the 3D board, designed for a four-year-old who can't
 // read yet: two giant picture buttons (a smiling sun for "dry", a hugging
-// heart for "not dry"), the star counter, the underpants meter with the
-// underpants at the top, and Coach Rex's words as a caption. Grown-up
+// heart for "not dry"), the star counter, the meter of dry nights in a row
+// with the underwear at the top, and Coach Rex's words as a caption. Grown-up
 // controls hide behind the moon button.
 
 import { useEffect, useRef, useState } from 'react';
 import { useGame, useQuest, useSave } from '../state/store';
-import { endPreview, pressDry, pressWet, replayToday, setupDone, setupNameDone, setupPickColor, setupPickSpecies, skipIntro, startFromSplash } from '../game/director';
+import { collectPrize, endPreview, pressDry, pressWet, replayToday, setupDone, setupNameDone, setupPickColor, setupPickSpecies, skipIntro, startFromSplash } from '../game/director';
 import { ParentButton, ParentPanel } from './ParentArea';
 import { ArrowIcon, BigHeartIcon, BigSunIcon, ChestIcon, ReplayIcon, SoundOffIcon, SoundOnIcon, StarIcon, UnderpantsIcon } from './icons';
 import { landRange, landOf } from '../state/progress';
@@ -71,7 +71,7 @@ function StarCounter() {
   );
 }
 
-function UnderpantsMeter() {
+function UnderwearMeter() {
   const meter = useGame((s) => s.shownMeter);
   const scene = useGame((s) => s.scene);
   const highlight = useGame((s) => s.highlight);
@@ -81,7 +81,7 @@ function UnderpantsMeter() {
   const filled = Math.min(goal, meter);
   const dots = Array.from({ length: goal }, (_, i) => goal - 1 - i);
   return (
-    <div className={`meter${highlight === 'meter' ? ' glow' : ''}${earned ? ' earned' : ''}`} role="img" aria-label={`Underpants meter: ${filled} of ${goal} dry nights in a row${earned ? ' — underpants earned!' : ''}`}>
+    <div className={`meter${highlight === 'meter' ? ' glow' : ''}${earned ? ' earned' : ''}`} role="img" aria-label={`Underwear meter: ${filled} of ${goal} dry nights in a row${earned ? ' — ready for underwear at night!' : ''}`}>
       <div className="meter-top">
         <UnderpantsIcon size={46} gold={earned || filled >= goal} />
       </div>
@@ -185,15 +185,28 @@ function Done() {
   );
 }
 
+/** The big button under the prize that floats out of the egg. */
+function CollectButton() {
+  const awaiting = useGame((s) => s.awaiting);
+  if (awaiting !== 'collect') return null;
+  return (
+    <button className="collect-btn" onClick={() => collectPrize()} aria-label="Collect the prize">
+      <StarIcon size={40} />
+      <span>Collect!</span>
+    </button>
+  );
+}
+
+/** Only for a grown-up's preview: a "Watch it again" replay is just the game. */
 function PreviewBanner() {
   const preview = useGame((s) => s.preview);
   const setupStep = useGame((s) => s.setupStep);
-  if (!preview || preview.kind === 'intro' || setupStep) return null;
+  if (!preview || preview.replay || preview.kind === 'intro' || setupStep) return null;
   return (
     <div className="preview-banner" role="status">
-      <span>Preview — real progress is unchanged</span>
+      <span>Grown-up preview</span>
       <button className="btn small" onClick={() => endPreview()}>
-        End preview
+        Stop
       </button>
     </div>
   );
@@ -223,7 +236,7 @@ function SetupName() {
         setupNameDone(value);
       }}
     >
-      <h1>Dino Underpants Quest</h1>
+      <h1>Dino Underwear Quest</h1>
       <p className="muted">For grown-ups: who is going on this quest?</p>
       <label className="name-field">
         <span>Name</span>
@@ -240,7 +253,7 @@ function SetupName() {
 function SetupDino() {
   return (
     <div className="setup-bottom" role="group" aria-label="Pick your dino">
-      <p className="setup-hint">Tap your dino!</p>
+      <p className="setup-hint">Pick your dino!</p>
       <div className="species-row">
         {SPECIES.map((s) => (
           <button key={s.id} className="btn chip-btn" onClick={() => setupPickSpecies(s.id)}>
@@ -276,13 +289,22 @@ function SetupColor() {
   );
 }
 
-function Setup() {
+function useSetupStep() {
   const step = useGame((s) => s.setupStep);
   const scene = useGame((s) => s.scene);
-  if (!step || scene !== 'setup') return null;
-  if (step === 'name') return <SetupName />;
+  return step && scene === 'setup' ? step : null;
+}
+
+function Setup() {
+  return useSetupStep() === 'name' ? <SetupName /> : null;
+}
+
+/** The setup choices that sit along the bottom edge. */
+function SetupBottom() {
+  const step = useSetupStep();
   if (step === 'dino') return <SetupDino />;
-  return <SetupColor />;
+  if (step === 'color') return <SetupColor />;
+  return null;
 }
 
 export function Overlay() {
@@ -294,12 +316,16 @@ export function Overlay() {
         <SoundToggle />
         <ParentButton />
         <StarCounter />
-        <UnderpantsMeter />
-        <Caption />
-        <MorningButtons />
-        <Done />
+        <UnderwearMeter />
         <SkipIntro />
         <Setup />
+        <div className="dock">
+          <Caption />
+          <CollectButton />
+          <MorningButtons />
+          <Done />
+          <SetupBottom />
+        </div>
       </div>
       <Splash />
       <PreviewBanner />

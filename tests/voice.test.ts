@@ -6,13 +6,23 @@ import { ACCESSORIES } from '../src/game/rewards';
 const clips = new Set(Object.keys(import.meta.glob('../src/voice/clips/*.mp3')).map((k) => k.replace(/^.*\/(.*)\.mp3$/, '$1')));
 
 describe('Coach Rex lines', () => {
-  it('has a recorded clip for every line (and every name-free twin)', () => {
+  it('has a recorded clip for every line (and every twin)', () => {
     const missing: string[] = [];
     for (const [id, line] of Object.entries(LINES)) {
       if (!clips.has(id)) missing.push(id);
       if (line.nameless && !clips.has(`${id}--nameless`)) missing.push(`${id}--nameless`);
+      if (line.anyGoal && !clips.has(`${id}--anygoal`)) missing.push(`${id}--anygoal`);
     }
     expect(missing).toEqual([]);
+  });
+
+  it('has no clips left over from old lines', () => {
+    const wanted = new Set(Object.entries(LINES).flatMap(([id, l]) => [id, ...(l.nameless ? [`${id}--nameless`] : []), ...(l.anyGoal ? [`${id}--anygoal`] : [])]));
+    expect([...clips].filter((c) => !wanted.has(c))).toEqual([]);
+  });
+
+  it('calls it underwear', () => {
+    for (const [id, l] of Object.entries(LINES)) expect(`${l.text} ${l.nameless ?? ''} ${l.anyGoal ?? ''}`, id).not.toMatch(/underpants/i);
   });
 
   it('only says lines that exist', () => {
@@ -30,5 +40,14 @@ describe('Coach Rex lines', () => {
     expect(clipId('greet-1', 'zef')).toBe('greet-1');
     expect(clipId('greet-1', 'Milo')).toBe('greet-1--nameless');
     expect(clipId('dry-1', 'Milo')).toBe('dry-1');
+  });
+
+  it('only says "twenty nights" when that is the goal', () => {
+    expect(lineText('intro-meter', 'Zef', 20)).toMatch(/twenty nights/);
+    expect(lineText('intro-meter', 'Zef', 14)).not.toMatch(/twenty/);
+    expect(clipId('intro-meter', 'Zef', 20)).toBe('intro-meter');
+    expect(clipId('intro-meter', 'Zef', 14)).toBe('intro-meter--anygoal');
+    expect(clipId('intro-meter', 'Milo', 14)).toBe('intro-meter--anygoal');
+    expect(clipId('store-open', 'Milo', 14)).toBe('store-open--nameless');
   });
 });

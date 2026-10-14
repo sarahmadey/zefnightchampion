@@ -3,8 +3,8 @@
 // coach's jaw can follow the loudness. If a clip is missing or sound is off,
 // the line still shows as a caption for about as long as it would take to say.
 
-import { audio, audioIfReady, duckMusic } from '../audio/core';
-import { clipId, lineText } from './lines';
+import { audio, audioIfReady, audioWhenReady, duckMusic } from '../audio/core';
+import { SPOKEN_GOAL, clipId, lineText } from './lines';
 import { index, pack } from 'virtual:voice-pack';
 
 let bytes: Uint8Array | null = null;
@@ -53,6 +53,8 @@ export function hasClip(id: string): boolean {
 let current: AudioBufferSourceNode | null = null;
 let currentDone: (() => void) | null = null;
 let speakingUntil = 0;
+/** Bumped by every say() and stop(), so a line still loading never talks over a newer one. */
+let turn = 0;
 
 /** Roughly how long a line takes to say (for captions when there's no audio). */
 export function estimateSeconds(text: string): number {
@@ -62,11 +64,12 @@ export function estimateSeconds(text: string): number {
 
 export const voice = {
   /** Warm the cache for lines that are about to be said. */
-  prefetch(ids: string[], name: string) {
+  prefetch(ids: string[], name: string, goal = SPOKEN_GOAL) {
     if (!audioIfReady()) return;
-    for (const id of ids) void load(clipId(id, name));
+    for (const id of ids) void load(clipId(id, name, goal));
   },
   stop() {
+    turn++;
     if (current) {
       try {
         current.stop();
@@ -75,6 +78,7 @@ export const voice = {
       }
     }
     current = null;
+    speakingUntil = 0;
     currentDone?.();
     currentDone = null;
   },
@@ -82,19 +86,19 @@ export const voice = {
     return performance.now() < speakingUntil;
   },
   /**
-   * Say a line. Resolves when it has been said (or after the estimated time
-   * when there's no audio). `onStart` fires as the sound begins.
+   * Start saying a line. Resolves with how long it takes to say (the
+   * estimated time when there's no audio, 0 if a newer line took over).
    */
-  async say(id: string, name: string, enabled: boolean): Promise<number> {
+  async say(id: string, name: string, enabled: boolean, goal = SPOKEN_GOAL): Promise<number> {
     this.stop();
-    const text = lineText(id, name);
+    const mine = turn;
+    const text = lineText(id, name, goal);
     const est = estimateSeconds(text);
-    const c = enabled ? audioIfReady() : null;
-    const buf = c ? await load(clipId(id, name)) : null;
-    if (!c || !buf) {
-      speakingUntil = performance.now() + est * 1000;
-      return est;
-    }
+    speakingUntil = performance.now() + est * 1000;
+    const c = enabled ? await audioWhenReady() : null;
+    const buf = c ? await load(clipId(id, name, goal)) : null;
+    if (mine !== turn) return 0;
+    if (!c || !buf) return est;
     const src = c.ctx.createBufferSource();
     src.buffer = buf;
     src.connect(c.voice);

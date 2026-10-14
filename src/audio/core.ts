@@ -38,7 +38,7 @@ function create(): AudioCore | null {
     const voice = ctx.createGain();
     voice.gain.value = 1.0;
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 512;
+    analyser.fftSize = 1024;
     voice.connect(analyser);
     voice.connect(master);
     return { ctx, master, sfx, music, voice, analyser };
@@ -57,6 +57,24 @@ export function audio(): AudioCore | null {
 /** The graph only if it already exists (never creates one outside a gesture). */
 export function audioIfReady(): AudioCore | null {
   return core && core.ctx.state === 'running' ? core : null;
+}
+
+/**
+ * The graph once it's running. Right after the first tap the browser is
+ * still waking the sound up, so wait a moment for that instead of skipping
+ * whatever was meant to play.
+ */
+export async function audioWhenReady(timeoutMs = 800): Promise<AudioCore | null> {
+  if (!core) return null;
+  if (core.ctx.state !== 'running') {
+    let timer = 0;
+    await Promise.race([
+      core.ctx.resume().catch(() => undefined),
+      new Promise<void>((resolve) => (timer = window.setTimeout(resolve, timeoutMs))),
+    ]);
+    clearTimeout(timer);
+  }
+  return core.ctx.state === 'running' ? core : null;
 }
 
 export function unlockAudio() {
@@ -102,7 +120,7 @@ export function duckMusic(on: boolean) {
   if (core) core.music.gain.setTargetAtTime(musicLevel(), core.ctx.currentTime, 0.15);
 }
 
-const levelBuf = new Float32Array(512);
+const levelBuf = new Float32Array(1024);
 
 /** Loudness of the voice right now (0..1), for Coach Rex's moving jaw. */
 export function voiceLevel(): number {

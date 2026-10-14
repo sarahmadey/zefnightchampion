@@ -1,6 +1,7 @@
 // Things that appear during a morning event: the big star that flies to the
-// board, the mystery egg that cracks open, the glowing high-five target, and
-// the friendly pterodactyl that flies Zef to the Underpants Store.
+// board, the mystery egg that cracks open and the prize that floats out of it,
+// the glowing high-five target, and the friendly pterodactyl that flies Zef
+// to the Underwear Store.
 
 import { useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -13,18 +14,26 @@ import { frameDt } from '../game/actors';
 import { sfx } from '../audio/sfx';
 import { Ellipsoid, RoundCone, Sculpt, meshSculpt } from '../dino/sdf';
 import { skinMaterial } from '../dino/skin';
+import { buildAccessory } from '../dino/accessories';
+import { ACCESSORIES, type Species } from '../game/rewards';
 
 export const fx = {
   star: { active: false, t: 0, dur: 1.3, to: new THREE.Vector3(), from: new THREE.Vector3(), started: false, done: null as null | (() => void) },
   egg: { visible: false, pos: new THREE.Vector3(), wobble: 0, crack: 0, hatch: 0, pop: 0 },
+  /** the prize out of the egg, shown big and spinning before it goes on */
+  prize: { visible: false, index: -1, species: 'trex' as Species, pos: new THREE.Vector3(), size: 1, float: 1 },
   hand: { visible: false, pos: new THREE.Vector3(), follow: null as null | { hand: THREE.Vector3 } },
   ptero: { visible: false, pos: new THREE.Vector3(), heading: 0, flap: 1, carry: false },
 };
 
 let eggTap: (() => void) | null = null;
 let handTap: (() => void) | null = null;
+let prizeTap: (() => void) | null = null;
 export function onEggTap(fn: (() => void) | null) {
   eggTap = fn;
+}
+export function onPrizeTap(fn: (() => void) | null) {
+  prizeTap = fn;
 }
 export function onHandTap(fn: (() => void) | null) {
   handTap = fn;
@@ -215,11 +224,86 @@ function Egg() {
         position={[0, 0.45, 0]}
         visible={false}
         onPointerDown={(ev) => {
+          if (!eggTap) return;
           ev.stopPropagation();
-          eggTap?.();
+          eggTap();
         }}
       >
         <sphereGeometry args={[0.95, 10, 8]} />
+      </mesh>
+    </group>
+  );
+}
+
+// -------------------------------------------------------------- the prize
+
+/** The accessory on its own, centred and one unit across (shoes come as a pair). */
+function showcaseModel(index: number, species: Species): THREE.Group {
+  const inner = new THREE.Group();
+  if (ACCESSORIES[index].slot === 'feet') {
+    for (const side of [-1, 1]) {
+      const shoe = buildAccessory(index, species);
+      shoe.position.x = side * 0.13;
+      shoe.rotation.y = side * -0.2;
+      inner.add(shoe);
+    }
+  } else {
+    inner.add(buildAccessory(index, species));
+  }
+  inner.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(inner);
+  const size = box.getSize(new THREE.Vector3());
+  const k = 1 / Math.max(size.x, size.y, size.z, 0.05);
+  inner.scale.setScalar(k);
+  inner.position.copy(box.getCenter(new THREE.Vector3())).multiplyScalar(-k);
+  const wrap = new THREE.Group();
+  wrap.add(inner);
+  return wrap;
+}
+
+function PrizeShowcase() {
+  const g = useRef<THREE.Group>(null!);
+  const holder = useRef<THREE.Group>(null!);
+  const st = useRef({ key: '', t: 0, spinners: [] as THREE.Object3D[] });
+  useFrame((_, raw) => {
+    const p = fx.prize;
+    const show = p.visible && p.index >= 0 && p.index < ACCESSORIES.length;
+    g.current.visible = show;
+    if (!show) return;
+    const dt = frameDt(raw);
+    const s = st.current;
+    const key = `${p.index}|${p.species}`;
+    if (key !== s.key) {
+      holder.current.clear();
+      const model = showcaseModel(p.index, p.species);
+      holder.current.add(model);
+      s.spinners = [];
+      model.traverse((o) => o.userData.spin && s.spinners.push(o));
+      holder.current.rotation.set(0, 0, 0);
+      s.key = key;
+    }
+    s.t += dt;
+    g.current.position.copy(p.pos);
+    g.current.position.y += Math.sin(s.t * 2.4) * 0.06 * p.float;
+    g.current.scale.setScalar(Math.max(0.001, p.size));
+    // turn slowly to show it off, with a little tilt toward the camera
+    holder.current.rotation.y += dt * (0.4 + 0.9 * p.float);
+    holder.current.rotation.x = 0.18 * p.float;
+    for (const o of s.spinners) o.rotation.y += dt * (o.userData.spin as number);
+  });
+  return (
+    <group ref={g} visible={false}>
+      <group ref={holder} />
+      <Glow color="#fff1a8" size={2.1} opacity={0.5} />
+      <mesh
+        visible={false}
+        onPointerDown={(ev) => {
+          if (!prizeTap) return;
+          ev.stopPropagation();
+          prizeTap();
+        }}
+      >
+        <sphereGeometry args={[0.75, 10, 8]} />
       </mesh>
     </group>
   );
@@ -355,6 +439,7 @@ export function EventProps() {
     <>
       <FlyingStar />
       <Egg />
+      <PrizeShowcase />
       <HandTarget />
       <Pterodactyl />
     </>

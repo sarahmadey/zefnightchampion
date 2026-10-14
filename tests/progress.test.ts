@@ -23,6 +23,7 @@ import {
   normalizeSave,
   parseBackup,
   seenFromRecords,
+  startOver,
   withRecord,
 } from '../src/state/save';
 import {
@@ -244,5 +245,29 @@ describe('save data', () => {
     expect(n.profile.species).toBe('trike');
     expect(n.prizes).toEqual(d.prizes);
     expect(seenFromRecords(n).stars).toBe(0);
+  });
+
+  it('starts over from the very first screen, keeping only the grown-up settings', () => {
+    let d = defaultSave(NOW);
+    d = {
+      ...d,
+      records: dryRun(TODAY, 30),
+      profile: { ...d.profile, name: 'Milo', species: 'stego', color: 3, setupDone: true },
+      rules: { ...d.rules, goal: 14 },
+      prizes: [{ label: 'Zoo trip', icon: 'gift' }],
+      outfit: { head: 2 },
+      settings: { ...d.settings, music: false },
+    };
+    d = applyDerived(d);
+    const n = startOver(d, NOW);
+    expect(n.records).toEqual({});
+    expect(n.profile).toEqual(defaultSave(NOW).profile);
+    expect(n.profile.setupDone).toBe(false);
+    expect(n.outfit).toEqual({});
+    expect(n.underpants.earned).toBe(false);
+    expect(n.seen.stars).toBe(0);
+    expect(n.rules.goal).toBe(14);
+    expect(n.prizes).toEqual(d.prizes);
+    expect(n.settings.music).toBe(false);
   });
 });

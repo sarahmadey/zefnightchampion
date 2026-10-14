@@ -300,6 +300,16 @@ export function newQuest(data: SaveData, now: Date = new Date()): SaveData {
   return { ...fresh, profile: { ...data.profile }, settings: data.settings, prizes: data.prizes, rules: data.rules };
 }
 
+/**
+ * Back to the very first screen: the name, a new dino and the intro, with
+ * nothing recorded. Only the grown-up's own choices stay: the prize list, the
+ * goal and the sound settings.
+ */
+export function startOver(data: SaveData, now: Date = new Date()): SaveData {
+  const fresh = defaultSave(now);
+  return { ...fresh, settings: data.settings, prizes: data.prizes, rules: data.rules };
+}
+
 export function exportBackup(data: SaveData, now: Date = new Date()): string {
   const { settings: _settings, ...rest } = data;
   void _settings;
@@ -325,7 +335,7 @@ export function parseBackup(text: string, current: SaveData, now: Date = new Dat
     data.seen = seenFromRecords(data);
     return { ok: true, data, recordCount: Object.keys(records).length, dropped, fromOldVersion: true };
   }
-  if (app !== APP_ID) return { ok: false, error: "That file doesn't look like a Dino Underpants Quest backup." };
+  if (app !== APP_ID) return { ok: false, error: "That file doesn't look like a Dino Underwear Quest backup." };
   const { dropped } = cleanRecords((raw as Record<string, unknown>).records, todayKey(now));
   const normalized = normalizeSave(raw, now);
   if (!normalized) return { ok: false, error: 'That backup is from an unknown version.' };

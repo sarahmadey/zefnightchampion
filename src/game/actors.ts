@@ -57,6 +57,8 @@ export interface DinoActor {
   glow: number;
   /** world position of the high-five hand (or front foot), updated by the rig */
   hand: THREE.Vector3;
+  /** world positions where each kind of accessory sits, updated by the rig */
+  slots: Record<'head' | 'face' | 'neck' | 'body' | 'prop' | 'feet', THREE.Vector3>;
 }
 
 export function makeActor(x: number, z: number): DinoActor {
@@ -74,6 +76,14 @@ export function makeActor(x: number, z: number): DinoActor {
     scale: 1,
     glow: 0,
     hand: new THREE.Vector3(),
+    slots: {
+      head: new THREE.Vector3(x, 1.3, z),
+      face: new THREE.Vector3(x, 1.2, z),
+      neck: new THREE.Vector3(x, 1, z),
+      body: new THREE.Vector3(x, 0.8, z),
+      prop: new THREE.Vector3(x, 0.7, z),
+      feet: new THREE.Vector3(x, 0.05, z),
+    },
   };
 }
 

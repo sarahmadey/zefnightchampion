@@ -24,7 +24,7 @@ function Ticker() {
     const dt = frameDt(rawDt);
     sharedTime.value += dt;
     clock.tick(dt);
-    updateTalk();
+    updateTalk(dt);
   });
   return null;
 }
@@ -83,7 +83,7 @@ export function App() {
         dpr={[1, quality.maxDpr]}
         camera={{ position: [0, 6, 12], fov: 50, near: 0.1, far: 900 }}
         gl={{ antialias: true, toneMapping: THREE.NeutralToneMapping, powerPreference: 'high-performance' }}
-        aria-label="Dino Underpants Quest: a 3D dinosaur board game"
+        aria-label="Dino Underwear Quest: a 3D dinosaur board game"
       >
         <Suspense fallback={null}>
           <Ticker />

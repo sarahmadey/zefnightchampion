@@ -8,6 +8,7 @@ import {
   newQuest,
   persistSave,
   seenFromRecords,
+  startOver,
   withRecord,
   type Profile,
   type SaveData,
@@ -32,6 +33,7 @@ interface SaveStore {
   markSeen: (patch: Partial<Seen>) => void;
   replace: (data: SaveData) => void;
   startNewQuest: () => void;
+  startOver: () => void;
 }
 
 function commit(data: SaveData): boolean {
@@ -91,6 +93,9 @@ export const useSave = create<SaveStore>((set, get) => {
       const next = newQuest(get().data);
       put({ ...next, seen: seenFromRecords(next) });
     },
+    startOver() {
+      put(startOver(get().data));
+    },
   };
 });
 
@@ -107,6 +112,8 @@ export type PreviewKind = 'dry' | 'wet' | 'prize' | 'store' | 'intro';
 
 export interface PreviewState {
   kind: PreviewKind;
+  /** the child's own "Watch it again", not a grown-up's preview */
+  replay?: boolean;
 }
 
 /** A line of text shown while the coach talks (also read to screen readers). */
@@ -128,7 +135,7 @@ interface GameStore {
   openedChests: number;
   /** the dino wears its store underpants */
   showUnderpants: boolean;
-  /** underpants picked during a preview (never saved) */
+  /** underwear picked during a preview (never saved) */
   previewUnderpants: number | null;
   /** the overlay piece Coach Rex is talking about */
   highlight: 'meter' | 'stars' | null;
@@ -152,7 +159,7 @@ interface GameStore {
   /** dress-up shelf is open */
   dressUp: boolean;
   /** waiting for the child to tap something during an event */
-  awaiting: null | 'highfive' | 'egg' | 'roar' | 'chest' | 'store-pick' | 'hug-done';
+  awaiting: null | 'highfive' | 'egg' | 'collect' | 'roar' | 'chest' | 'store-pick' | 'hug-done';
   /** increments to ask the director to re-check progress */
   checkToken: number;
   set: (patch: Partial<Omit<GameStore, 'set'>>) => void;

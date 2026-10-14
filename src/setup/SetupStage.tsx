@@ -6,7 +6,7 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { SceneEnv } from '../three/SceneEnv';
 import { Dino } from '../dino/Dino';
-import { type DinoActor, play } from '../game/actors';
+import { type DinoActor, makeActor, play } from '../game/actors';
 import { DINO_COLORS, SPECIES, type Species } from '../game/rewards';
 import { useGame, useSave } from '../state/store';
 import { setupPickSpecies } from '../game/director';
@@ -19,24 +19,10 @@ import { Glow } from '../three/bits';
 export const SETUP_ORIGIN = new THREE.Vector3(0, 0, -800);
 
 export const lineup: Record<Species, DinoActor> = Object.fromEntries(
-  SPECIES.map((s, i) => [
-    s.id,
-    {
-      pos: new THREE.Vector3(SETUP_ORIGIN.x + (i - 1.5) * 1.62, 0.12, SETUP_ORIGIN.z),
-      heading: 0,
-      air: 0,
-      stretch: 1,
-      action: { name: 'none', t: 0, dur: 0, loop: false },
-      expression: 'smile',
-      look: null,
-      talk: 0,
-      walk: 0,
-      visible: true,
-      scale: 1,
-      glow: 0,
-      hand: new THREE.Vector3(),
-    } satisfies DinoActor,
-  ]),
+  SPECIES.map((s, i) => {
+    const x = SETUP_ORIGIN.x + (i - 1.5) * 1.62;
+    return [s.id, { ...makeActor(x, SETUP_ORIGIN.z), pos: new THREE.Vector3(x, 0.12, SETUP_ORIGIN.z), heading: 0 }];
+  }),
 ) as Record<Species, DinoActor>;
 
 const stageMat = new THREE.MeshPhysicalMaterial({ color: '#8fd16a', roughness: 0.8 });

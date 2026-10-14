@@ -46,6 +46,8 @@ const G = {
   openCyl: () => cachedGeo('a-ocyl', () => new THREE.CylinderGeometry(1, 1, 1, 28, 1, true)),
   cone: () => cachedGeo('a-cone', () => new THREE.ConeGeometry(1, 1, 22).translate(0, 0.5, 0)),
   torus: () => cachedGeo('a-torus', () => new THREE.TorusGeometry(1, 0.25, 10, 32)),
+  /** a thin ring that hugs a sphere's surface */
+  seam: () => cachedGeo('a-seam', () => new THREE.TorusGeometry(1, 0.035, 6, 56)),
   box: (r = 0.15) => cachedGeo(`a-box-${r}`, () => roundedBox(1, 1, 1, r, 3)),
 };
 
@@ -404,7 +406,8 @@ function boots() {
 
 function soccerBall() {
   const geo = cachedGeo('soccer', () => {
-    const g = new THREE.IcosahedronGeometry(1, 1);
+    // fine enough to stay round when it's shown big out of the egg
+    const g = new THREE.IcosahedronGeometry(1, 3);
     const pos = g.getAttribute('position') as THREE.BufferAttribute;
     const colors = new Float32Array(pos.count * 3);
     const a = new THREE.Vector3();
@@ -422,12 +425,14 @@ function soccerBall() {
       for (let k = 0; k < 3; k++) colors.set([c, c, c], (f * 3 + k) * 3);
     }
     g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    // round it out
+    // round it out, with smooth sphere normals (the patches keep crisp edges)
+    const nrm = new Float32Array(pos.count * 3);
     for (let i = 0; i < pos.count; i++) {
       a.fromBufferAttribute(pos, i).normalize();
       pos.setXYZ(i, a.x, a.y, a.z);
+      nrm.set([a.x, a.y, a.z], i * 3);
     }
-    g.computeVertexNormals();
+    g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
     return g;
   });
   const g = new THREE.Group();
@@ -439,9 +444,9 @@ function basketball() {
   const g = new THREE.Group();
   g.add(m(G.sph(), plastic('#f76707', 0.7), [0, 0, 0], [0, 0, 0], 0.11));
   const seam = plastic('#2b1b0e', 0.6);
-  g.add(m(G.torus(), seam, [0, 0, 0], [0, 0, 0], [0.111, 0.111, 0.02]));
-  g.add(m(G.torus(), seam, [0, 0, 0], [0, Math.PI / 2, 0], [0.111, 0.111, 0.02]));
-  g.add(m(G.torus(), seam, [0, 0, 0], [Math.PI / 2, 0, 0], [0.111, 0.111, 0.02]));
+  g.add(m(G.seam(), seam, [0, 0, 0], [0, 0, 0], 0.1105));
+  g.add(m(G.seam(), seam, [0, 0, 0], [0, Math.PI / 2, 0], 0.1105));
+  g.add(m(G.seam(), seam, [0, 0, 0], [Math.PI / 2, 0, 0], 0.1105));
   return g;
 }
 

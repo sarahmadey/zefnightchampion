@@ -25,13 +25,13 @@ import { computeQuest, landOf, landRange, todayKey, type QuestState } from '../s
 import { ACCESSORIES, accessoriesUnlocked, accessoryForStar, prizeAt, surpriseFor, type Prize, type Species } from './rewards';
 import { chestPos, landCurve, restPos, spacePos, storeLandmarkPos } from '../board/layout';
 import { chestAnim, onChestTap } from '../board/Chest';
-import { flyStar, fx, onEggTap, onHandTap } from '../board/EventProps';
+import { flyStar, fx, onEggTap, onHandTap, onPrizeTap } from '../board/EventProps';
 import { pedestalHeight, pedestalPos, STORE_ORIGIN } from '../store/StoreScene';
 import { lineup } from '../setup/SetupStage';
 import { voice } from '../voice/voice';
 import { lineText } from '../voice/lines';
 import { boardView } from './CameraRig';
-import { clamp, ease, lerp } from '../three/util';
+import { clamp, ease } from '../three/util';
 
 interface Ctx {
   wait: (s: number) => Promise<void>;
@@ -92,12 +92,20 @@ function childName() {
   return data().profile.name || 'Zef';
 }
 
+function goal() {
+  return data().rules.goal;
+}
+
+function prefetch(ids: string[]) {
+  voice.prefetch(ids, childName(), goal());
+}
+
 /** Say a line: caption on screen, Coach Rex's jaw moving, wait until it's said. */
 async function say(ctx: Ctx, id: string, pad = 0.25) {
   const g = useGame.getState();
-  const text = lineText(id, childName());
+  const text = lineText(id, childName(), goal());
   g.set({ caption: { text, who: 'coach' } });
-  const dur = await voice.say(id, childName(), data().settings.sound);
+  const dur = await voice.say(id, childName(), data().settings.sound, goal());
   const end = clock.time + dur;
   await ctx.until(() => clock.time >= end, dur + 2);
   if (useGame.getState().caption?.text === text) useGame.getState().set({ caption: null });
@@ -106,19 +114,26 @@ async function say(ctx: Ctx, id: string, pad = 0.25) {
 
 /** Start a line without waiting for it to finish. */
 function sayAsync(id: string) {
-  const text = lineText(id, childName());
+  const text = lineText(id, childName(), goal());
   useGame.getState().set({ caption: { text, who: 'coach' } });
-  void voice.say(id, childName(), data().settings.sound).then((dur) => {
+  void voice.say(id, childName(), data().settings.sound, goal()).then((dur) => {
     setTimeout(() => {
       if (useGame.getState().caption?.text === text) useGame.getState().set({ caption: null });
     }, dur * 1000 + 200);
   });
 }
 
-/** Per-frame: the coach's jaw follows the voice. */
-export function updateTalk() {
+/**
+ * Per-frame: the coach's jaw follows the voice. The loudness goes through a
+ * soft curve (quiet breaths keep the mouth closed, loud words don't slam it
+ * wide open) and then opens quickly and closes a little slower, so the mouth
+ * moves with the words instead of flickering with every wobble of the sound.
+ */
+export function updateTalk(dt: number) {
   const lvl = voice.speaking() ? voiceLevel() : 0;
-  coach.talk = coach.talk + (Math.min(1, lvl * 1.6) - coach.talk) * 0.5;
+  const target = Math.pow(clamp((lvl - 0.08) / 0.8, 0, 1), 0.75);
+  const tau = target > coach.talk ? 0.045 : 0.13;
+  coach.talk += (target - coach.talk) * (1 - Math.exp(-dt / tau));
 }
 
 function shot(pos: THREE.Vector3, target: THREE.Vector3, lambda = 2.2, fit = 0) {
@@ -293,7 +308,7 @@ export function startFromSplash() {
     closeShot(2);
     const greets = ['greet-1', 'greet-2', 'greet-3'];
     const day = new Date().getDate();
-    voice.prefetch(['ask', 'already', ...greets], childName());
+    prefetch(['ask', 'already', ...greets]);
     await say(ctx, greets[day % 3]);
     if (hasPending()) {
       await playPending(ctx);
@@ -397,7 +412,7 @@ async function playPending(ctx: Ctx) {
   const q = computeQuest(d.records, d.rules);
   const g = useGame.getState();
   const latestDry = q.latest?.result === 'dry';
-  voice.prefetch(['dry-1', 'dry-2', 'dry-3', 'dry-4', 'dry-5', 'dry-6', 'wet-1', 'wet-2', 'wet-3', 'bye-1', 'bye-2', 'bye-3'], childName());
+  prefetch(['dry-1', 'dry-2', 'dry-3', 'dry-4', 'dry-5', 'dry-6', 'wet-1', 'wet-2', 'wet-3', 'bye-1', 'bye-2', 'bye-3']);
 
   // 1. new stars
   if (q.stars > g.shownStars) {
@@ -608,7 +623,7 @@ async function eggSurprise(ctx: Ctx, star: number, preview: boolean) {
     fx.egg.pop = i / 10;
     await ctx.wait(0.03);
   }
-  voice.prefetch(['egg-done', `acc-${ACCESSORIES[acc].id}`], childName());
+  prefetch(['egg-done', `acc-${ACCESSORIES[acc].id}`]);
   await say(ctx, 'egg', 0);
   // three taps crack it open; if nobody taps, it hatches by itself
   let taps = 0;
@@ -638,18 +653,101 @@ async function eggSurprise(ctx: Ctx, star: number, preview: boolean) {
   fx.egg.hatch = 1;
   sfx.play('hatch');
   burst('confetti', fx.egg.pos.clone().setY(fx.egg.pos.y + 0.7), { count: 50, speed: 3.5 });
-  burst('sparkle', hero.pos.clone().setY(hero.pos.y + 1.0), { count: 30, speed: 3 });
+
+  // the prize floats up out of the egg, big and spinning, in a close-up
+  const up = fx.egg.pos.clone().setY(fx.egg.pos.y + 1.3);
+  const prize = fx.prize;
+  prize.index = acc;
+  prize.species = data().profile.species;
+  prize.float = 1;
+  prize.size = 0.05;
+  prize.pos.copy(fx.egg.pos).setY(fx.egg.pos.y + 0.4);
+  prize.visible = true;
+  hero.look = up.clone();
+  coach.look = up.clone();
+  hero.expression = 'wow';
+  shot(up.clone().addScaledVector(back, 3.1).setY(up.y + 0.3), up.clone().setY(up.y - 0.05), 2.8, 1.9);
+  sfx.play('magic');
+  const from = prize.pos.clone();
+  let start = clock.time;
+  for (;;) {
+    await ctx.wait(0);
+    const u = clamp((clock.time - start) / 0.9, 0, 1);
+    prize.pos.lerpVectors(from, up, ease.outCubic(u));
+    prize.size = 0.05 + 1.1 * ease.outBack(u);
+    if (u >= 1) break;
+  }
+  burst('sparkle', up, { count: 36, speed: 3 });
+  play(coach, 'cheer', 1.6);
+  // "Look what was inside! Tap the big button to collect it!"
+  let collected = false;
+  const collect = () => {
+    collected = true;
+  };
+  onPrizeTap(collect);
+  collectTap = collect;
+  useGame.getState().set({ awaiting: 'collect' });
+  sayAsync('egg-done');
+  // a few twinkles round the edge (never in front of it)
+  const sideways = new THREE.Vector3(-back.z, 0, back.x);
+  const sparkles = setInterval(() => {
+    const a = Math.random() * Math.PI * 2;
+    const at = up.clone().addScaledVector(sideways, Math.cos(a) * 0.85).setY(up.y + Math.sin(a) * 0.7).addScaledVector(back, -0.3);
+    burst('sparkle', at, { count: 3, speed: 0.8 });
+  }, 650);
+  try {
+    // if nobody taps, it goes on by itself after a while
+    await ctx.until(() => collected, 25);
+  } finally {
+    clearInterval(sparkles);
+    onPrizeTap(null);
+    collectTap = null;
+    useGame.getState().set({ awaiting: null });
+  }
+  voice.stop();
+  useGame.getState().set({ caption: null });
+
+  // it flies onto Zef's dino
+  sfx.play('whoosh');
+  closeShot(2.4);
+  prize.float = 0;
+  const slot = ACCESSORIES[acc].slot;
+  const flyFrom = prize.pos.clone();
+  start = clock.time;
+  for (;;) {
+    await ctx.wait(0);
+    const u = clamp((clock.time - start) / 0.75, 0, 1);
+    const to = hero.slots[slot];
+    prize.pos.lerpVectors(flyFrom, to, ease.inOutSine(u));
+    prize.pos.y += Math.sin(u * Math.PI) * 0.9;
+    prize.size = 1.15 - 0.85 * ease.inCubic(u);
+    if (u >= 1) break;
+  }
+  prize.visible = false;
+  fx.egg.visible = false;
   useGame.getState().set({ shownAccessories: acc + 1 });
+  sfx.play('sparkle');
+  burst('sparkle', hero.slots[slot].clone(), { count: 40, speed: 3 });
+  burst('confetti', hero.pos.clone().setY(hero.pos.y + 1.2), { count: 30, speed: 3 });
   hero.look = null;
   coach.look = null;
-  hero.expression = 'wow';
-  play(hero, 'show', 2.2);
-  play(coach, 'cheer', 1.6);
-  await say(ctx, 'egg-done', 0);
   hero.expression = 'happy';
+  faceCamera(hero);
+  play(hero, 'show', 2.2);
+  // a close-up of Zef's dino wearing it
+  const toCam = new THREE.Vector3().subVectors(cameraPos(), hero.pos).setY(0).normalize();
+  shot(hero.pos.clone().addScaledVector(toCam, 3.2).setY(hero.pos.y + 1.4), hero.pos.clone().setY(hero.pos.y + 0.8), 2.4, 2.4);
   await say(ctx, `acc-${ACCESSORIES[acc].id}`);
-  fx.egg.visible = false;
   hero.expression = 'smile';
+}
+
+let collectTap: (() => void) | null = null;
+
+/** The big "Collect!" button under the prize from the egg. */
+export function collectPrize() {
+  if (useGame.getState().awaiting !== 'collect') return;
+  sfx.play('tap');
+  collectTap?.();
 }
 
 let highFiveSlap: (() => void) | null = null;
@@ -1013,7 +1111,7 @@ export function startPreview(kind: PreviewKind, fromChild = false) {
   if (data().settings.music) music.start();
   if (!g.preview) previewRestore = { stars: g.shownStars, meter: g.shownMeter, acc: g.shownAccessories, chests: g.openedChests, pants: g.showUnderpants };
   const myPreview = ++previewSeq;
-  g.set({ preview: { kind }, parentOpen: false, phase: 'event', scene: kind === 'intro' ? 'board' : g.scene });
+  g.set({ preview: { kind, replay: fromChild }, parentOpen: false, phase: 'event', scene: kind === 'intro' ? 'board' : g.scene });
   void runCutscene(`preview-${kind}`, async (ctx) => {
     const rules = data().rules;
     const stars = g.shownStars;
@@ -1082,6 +1180,7 @@ export function endPreview() {
   chestAnim.open = 0;
   chestAnim.rise = 0;
   fx.egg.visible = false;
+  fx.prize.visible = false;
   fx.hand.visible = false;
   fx.ptero.visible = false;
   fx.star.active = false;
@@ -1170,14 +1269,19 @@ export function setupDone() {
   });
 }
 
-/** Coach Rex explains the mission, with the camera showing each part. */
+/**
+ * Coach Rex explains the mission, with the camera showing each part: why
+ * (underwear at night instead of diapers), the morning button and the stars,
+ * the prizes along the way, the hug, the meter, and the Underwear Store where
+ * Zef picks out underwear for his dino.
+ */
 async function intro(ctx: Ctx) {
   const g = useGame.getState();
   g.set({ phase: 'event' });
   const rules = data().rules;
   const stars = g.shownStars;
   placeAt(stars);
-  voice.prefetch(['intro-1', 'intro-2', 'intro-3', 'intro-4', 'intro-5', 'intro-6'], childName());
+  prefetch(['intro-1', 'intro-2', 'intro-3', 'intro-prizes', 'intro-4', 'intro-meter', 'intro-store', 'intro-go']);
   closeShot(2);
   play(coach, 'wave', 1.8);
   await say(ctx, 'intro-1');
@@ -1189,24 +1293,34 @@ async function intro(ctx: Ctx) {
   hero.look = next.clone();
   await say(ctx, 'intro-3');
   hero.look = null;
+  // the chest at the end of this land: prizes along the way
+  const land = landOf(stars, rules);
+  const c = chestPos(land, rules);
+  shot(c.clone().add(new THREE.Vector3(3, 4, 7)), c.clone().setY(c.y + 1.2), 1.2);
+  Object.assign(chestAnim, { land, open: 0, rise: 0, wiggle: 1 });
+  g.set({ highlight: 'stars' });
+  await say(ctx, 'intro-prizes');
+  g.set({ highlight: null });
+  chestAnim.wiggle = 0;
+  chestAnim.land = -1;
+  // not dry: a hug
   closeShot(2);
   play(coach, 'hug', 2.2);
   await say(ctx, 'intro-4');
   coach.action.name = 'none';
-  // the Underpants Store, far away
-  const land = landOf(stars, rules);
+  // the meter: dry nights in a row fill it up
+  boardCamera(1.5);
+  g.set({ highlight: 'meter' });
+  await say(ctx, 'intro-meter');
+  g.set({ highlight: null });
+  // the Underwear Store, far away
   const store = storeLandmarkPos(land, rules);
   shot(hero.pos.clone().add(new THREE.Vector3(2, 4, 8)), store.clone().add(new THREE.Vector3(0, 3, 0)), 1.0);
-  g.set({ highlight: 'meter' });
-  await say(ctx, 'intro-5');
-  g.set({ highlight: null });
-  // the chest at the end of this land
-  const c = chestPos(land, rules);
-  shot(c.clone().add(new THREE.Vector3(3, 4, 7)), c.clone().setY(c.y + 1.2), 1.2);
-  g.set({ highlight: 'stars' });
-  await say(ctx, 'intro-6', 0);
-  g.set({ highlight: null });
+  await say(ctx, 'intro-store', 0.1);
   closeShot(2);
+  play(coach, 'cheer', 1.4);
+  play(hero, 'cheer', 1.4);
+  await say(ctx, 'intro-go', 0);
   play(coach, 'roar', 1.8);
   play(hero, 'roar', 1.8);
   sfx.play('roar', 1, 0.8);
@@ -1214,7 +1328,31 @@ async function intro(ctx: Ctx) {
   cam.shake = 0.25;
   await ctx.wait(1.8);
   boardCamera();
-  void lerp;
+}
+
+/**
+ * A grown-up's "start over": wipe the quest and go back to the very first
+ * screen (the name), so the dino picking and the intro play again.
+ */
+export function startOver() {
+  cancelCutscene();
+  previewRestore = null;
+  Object.assign(chestAnim, { land: -1, open: 0, rise: 0, wiggle: 0 });
+  fx.egg.visible = false;
+  fx.prize.visible = false;
+  fx.hand.visible = false;
+  fx.ptero.visible = false;
+  fx.star.active = false;
+  music.setMood('play');
+  for (const a of [hero, coach]) {
+    a.action.name = 'none';
+    a.expression = 'smile';
+    a.look = null;
+    a.visible = true;
+  }
+  useSave.getState().startOver();
+  useGame.getState().set({ preview: null, parentOpen: false, fade: 0, highlight: null, previewUnderpants: null, setupStep: null });
+  boot();
 }
 
 /** Re-place the dinos and camera after a grown-up resets or corrects things. */

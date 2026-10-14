@@ -9,7 +9,8 @@ src/voice/clips/<id>.mp3.
 Every clip is checked before it's kept: Whisper transcribes it and it must say
 its line, and (when the age/gender model is present) it must still sound like
 a man. A clip that fails is re-recorded with another seed. Clips whose text and
-voice settings haven't changed are skipped, so re-running is cheap.
+voice settings haven't changed are skipped, so re-running is cheap, and clips
+for lines that no longer exist are removed.
 
 Setup (CPU is fine, a GPU is faster):
   pip install qwen-tts torch faster-whisper librosa soundfile
@@ -45,7 +46,7 @@ STYLE = ("Speak like a fun, high-energy children's TV host: bright and warm, smi
 MOODS = [
     (r'^wet-', 'Gentle, warm and reassuring, still upbeat and smiling.'),
     (r'^(ask|ask-short|already)$', 'Curious and warm, asking a little kid a question.'),
-    (r'^intro-[345]$', 'Clear and upbeat, explaining a fun game to a little kid.'),
+    (r'^intro-(3|4|prizes|meter)$', 'Clear and upbeat, explaining a fun game to a little kid.'),
     (r'^(intro|greet|pick|picked|color)', 'Excited and warm, like telling a kid great news.'),
     (r'^(dry|first-star|hop|highfive|roar|dance|store)', 'Bursting with joy and celebrating, big and bouncy.'),
     (r'^(egg|acc-)', 'Amazed and excited, like opening a surprise.'),
@@ -169,6 +170,8 @@ def main():
         jobs.append((lid, line['text']))
         if line.get('nameless'):
             jobs.append((f'{lid}--nameless', line['nameless']))
+        if line.get('anyGoal'):
+            jobs.append((f'{lid}--anygoal', line['anyGoal']))
     only = set(x for x in a.only.split(',') if x)
     done, flagged = 0, []
     for lid, text in jobs:
@@ -185,7 +188,7 @@ def main():
             w, sr = tts.generate_custom_voice(text=text, language='English', speaker=SPEAKER, instruct=direction(lid))
             y = tighten(np.asarray(w[0], dtype=np.float32), sr)
             y16 = librosa.resample(y, orig_sr=sr, target_sr=16000)
-            heard = ' '.join(s.text.strip() for s in asr.transcribe(y16, beam_size=5, language='en', initial_prompt='Zef, Coach Rex, woo-hoo, underpants')[0])
+            heard = ' '.join(s.text.strip() for s in asr.transcribe(y16, beam_size=5, language='en', initial_prompt='Zef, Coach Rex, woo-hoo, underwear')[0])
             err = wer(text, heard)
             # too short to judge reliably
             m = male(y16) if male and len(y16) > 1.5 * 16000 else 1.0
@@ -206,6 +209,14 @@ def main():
         json.dump(manifest, open(manifest_path, 'w'), indent=1, sort_keys=True)
         done += 1
         print(f'{lid} ({len(y) / sr:.1f}s, WER {err:.0%}, male {m:.2f}): {text}', flush=True)
+    if not only:
+        wanted = {lid for lid, _ in jobs}
+        for f in os.listdir(OUT):
+            if f.endswith('.mp3') and f[:-4] not in wanted:
+                os.unlink(os.path.join(OUT, f))
+                manifest.pop(f[:-4], None)
+                print(f'removed {f} (no longer a line)')
+        json.dump(manifest, open(manifest_path, 'w'), indent=1, sort_keys=True)
     clips = [f for f in os.listdir(OUT) if f.endswith('.mp3')]
     total = sum(os.path.getsize(os.path.join(OUT, f)) for f in clips)
     print(f'recorded {done} clips; {len(clips)} clips, {total / 1024:.0f} KB in total')

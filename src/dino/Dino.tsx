@@ -84,6 +84,7 @@ function freshPose(): Pose {
 }
 
 const handTip = new THREE.Vector3();
+const slotTmp = new THREE.Vector3();
 
 const ENV = (u: number, a: number, b: number) => smoothstep(0, a, u) * (1 - smoothstep(b, 1, u));
 
@@ -481,7 +482,7 @@ export function Dino({ actor, species, color, outfit, coach = false, underpants 
       default:
         break;
     }
-    p.jaw = Math.max(p.jaw, actor.talk * 0.6);
+    p.jaw = Math.max(p.jaw, actor.talk * 0.45);
 
     // blinking
     s.blinkT -= dt;
@@ -507,7 +508,7 @@ export function Dino({ actor, species, color, outfit, coach = false, underpants 
     p.neckYaw += s.lookYaw * 0.4;
     p.headYaw += s.lookYaw * 0.6;
     p.headPitch += s.lookPitch * 0.7;
-    s.jaw = damp(s.jaw, p.jaw, 18, dt);
+    s.jaw = damp(s.jaw, p.jaw, 14, dt);
 
     // ---- apply
     rig.root.position.copy(actor.pos);
@@ -575,6 +576,10 @@ export function Dino({ actor, species, color, outfit, coach = false, underpants 
     else if (rig.arms.length) rig.arms[0].shoulder.localToWorld(handTip.set(0, -0.13, 0.02));
     else rig.legs[0].ankle.localToWorld(handTip.set(0, -0.02, 0.06));
     actor.hand.copy(handTip);
+    for (const k of ['head', 'face', 'neck', 'body', 'prop'] as const) rig.anchors[k].getWorldPosition(actor.slots[k]);
+    actor.slots.feet.set(0, 0, 0);
+    for (const f of rig.anchors.feet) actor.slots.feet.add(f.getWorldPosition(slotTmp));
+    actor.slots.feet.multiplyScalar(1 / Math.max(1, rig.anchors.feet.length));
 
     if (hitRef.current) {
       hitRef.current.position.set(actor.pos.x, actor.pos.y + actor.air + rig.height * 0.45 * sc, actor.pos.z);
