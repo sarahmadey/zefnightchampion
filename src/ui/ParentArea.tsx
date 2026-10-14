@@ -25,7 +25,9 @@ import {
   type NightResult,
 } from '../state/progress';
 import { exportBackup, parseBackup, type SaveData } from '../state/save';
-import { resetBoardView, startOver, startPreview } from '../game/director';
+import { removeCurrentChild, resetBoardView, showTitle, startOver, startPreview } from '../game/director';
+import { childList, type CloudStatus } from '../state/store';
+import { inViewer, retryCloud } from '../state/cloud';
 import { sfx } from '../audio/sfx';
 import { setMusicOn, setSoundOn } from '../audio/core';
 import { music } from '../audio/music';
@@ -34,6 +36,80 @@ import { viewerDownloads } from './viewerDownloads';
 import { DINO_COLORS, PRIZE_ICONS, SPECIES, prizeAt, type Prize, type PrizeIcon } from '../game/rewards';
 import { UNDERPANTS } from '../game/rewards';
 
+// ------------------------------------------------------------ children, saving and sharing
+
+function SaveStatus({ status }: { status: CloudStatus }) {
+  if (status === 'on') {
+    return (
+      <>
+        <p className="status-line ok">
+          Saved online with this game, under your Claude account. Open this link on any phone or tablet where you're signed in to Claude and the
+          adventures are there, up to date.
+        </p>
+        <details>
+          <summary>Share with family or friends</summary>
+          <p className="small">
+            <strong>Family who join in</strong> (another parent, a grandparent): open this page's Share menu and invite them by email as an{' '}
+            <strong>Editor</strong>. Once they're signed in to Claude, they see the same adventures and can press the morning button on their own phone.
+          </p>
+          <p className="small">
+            <strong>Other families</strong>: invite them by email as a <strong>Viewer</strong>. They can start an adventure for their own child, saved on
+            their own device, and they never see or change yours.
+          </p>
+          <p className="small muted">
+            Leave the public link off: while it's on, family members invited by email lose access to the shared adventures.
+          </p>
+        </details>
+      </>
+    );
+  }
+  if (status === 'connecting') return <p className="status-line">Connecting to this game's online storage...</p>;
+  if (status === 'guest')
+    return (
+      <p className="status-line">
+        Saved on this device only. You can play here, but this game's online storage belongs to the family who shared it, so your adventures stay in
+        this browser. Use Backup below to keep a copy.
+      </p>
+    );
+  return (
+    <>
+      <p className="status-line">Saved in this browser on this device. Use Backup below to keep a copy.</p>
+      {inViewer() && (
+        <button className="btn small" onClick={() => void retryCloud()}>
+          Turn on online saving
+        </button>
+      )}
+    </>
+  );
+}
+
+function ChildrenAndSaving({ name, onLeave }: { name: string; onLeave: () => void }) {
+  const library = useSave((s) => s.library);
+  const cloud = useSave((s) => s.cloud);
+  const others = childList(library)
+    .filter((c) => c.id !== library.current && c.data.profile.name.trim())
+    .map((c) => c.data.profile.name);
+  return (
+    <section className="card">
+      <h2>Children and saving</h2>
+      <p>
+        Playing now: <strong>{name}</strong>
+        {others.length > 0 && <span className="muted"> · also in this game: {others.join(', ')}</span>}
+      </p>
+      <button
+        className="btn"
+        onClick={() => {
+          onLeave();
+          showTitle();
+        }}
+      >
+        Switch child or add a child
+      </button>
+      <SaveStatus status={cloud} />
+    </section>
+  );
+}
+
 // ------------------------------------------------------------ the button
 
 export function ParentButton() {
@@ -41,6 +117,7 @@ export function ParentButton() {
   const [gate, setGate] = useState(false);
   const timer = useRef<number | null>(null);
   const parentOpen = useGame((s) => s.parentOpen);
+  const phase = useGame((s) => s.phase);
 
   const start = () => {
     setHolding(true);
@@ -55,7 +132,7 @@ export function ParentButton() {
     timer.current = null;
   };
 
-  if (parentOpen) return null;
+  if (parentOpen || phase === 'title') return null;
   return (
     <>
       <button
@@ -235,6 +312,7 @@ export function ParentPanel() {
   const open = useGame((s) => s.parentOpen);
   const data = useSave((s) => s.data);
   const storageOk = useSave((s) => s.storageOk);
+  const cloudStatus = useSave((s) => s.cloud);
   const [confirm, setConfirm] = useState<ConfirmSpec | null>(null);
   const [showDays, setShowDays] = useState(21);
   const [pastDate, setPastDate] = useState('');
@@ -373,7 +451,7 @@ export function ParentPanel() {
           </button>
         </header>
 
-        {!storageOk && (
+        {!storageOk && cloudStatus !== 'on' && (
           <p className="note warn">
             This browser isn't letting the game save. Progress will last until the page closes — use Export backup to keep it.
           </p>
@@ -661,9 +739,11 @@ export function ParentPanel() {
           </label>
         </section>
 
+        <ChildrenAndSaving name={name} onLeave={close} />
+
         <section className="card">
           <h2>Backup</h2>
-          <p className="muted small">Progress is saved on this device only. Export a backup to move or protect it.</p>
+          <p className="muted small">A copy of {name}'s adventure as a file, to keep safe or to bring into another copy of the game.</p>
           <div className="row">
             <button className="btn" onClick={doExport}>
               Export backup
@@ -721,7 +801,7 @@ export function ParentPanel() {
 
         <section className="card danger-zone">
           <h2>Start a new quest</h2>
-          <p className="muted small">Clears every recorded night, the stars, the prizes and the underwear on this device. Keeps the dino, the prize list and the goal.</p>
+          <p className="muted small">Clears {name}'s recorded nights, stars, prizes and underwear. Keeps the dino, the prize list and the goal.</p>
           <button
             className="btn danger"
             onClick={() =>
@@ -741,17 +821,17 @@ export function ParentPanel() {
           >
             Start new quest
           </button>
-          <h2 className="spaced">Start over from the very beginning</h2>
+          <h2 className="spaced">Start {name}'s adventure over</h2>
           <p className="muted small">
-            Everything goes back to the first screen: the name, picking a dino and a color, and Coach Rex's intro. Clears every recorded night, the stars,
-            the prizes and the underwear. Keeps the prize list, the goal and the sound settings.
+            Back to the very beginning for {name}: the name, picking a dino and a color, and Coach Rex's intro. Clears every recorded night, the stars,
+            the prizes and the underwear. Keeps the prize list and the goal. Other children's adventures aren't touched.
           </p>
           <button
             className="btn danger"
             onClick={() =>
               setConfirm({
-                title: 'Start over from the very beginning?',
-                body: <p>The name, the dino, every recorded night, the stars, opened chests and the underwear will be cleared, and the game goes back to its first screen. This can't be undone (unless you exported a backup).</p>,
+                title: `Start ${name}'s adventure over?`,
+                body: <p>{name}'s dino, every recorded night, the stars, opened chests and the underwear will be cleared, and the game goes back to the name screen. This can't be undone (unless you exported a backup).</p>,
                 confirm: 'Start over',
                 tone: 'danger',
                 onConfirm: () => startOver(),
@@ -759,6 +839,22 @@ export function ParentPanel() {
             }
           >
             Start over
+          </button>
+          <h2 className="spaced">Remove {name} from the game</h2>
+          <p className="muted small">Takes {name}'s adventure out of the game, on every device it's shared with. Other children's adventures aren't touched.</p>
+          <button
+            className="btn danger"
+            onClick={() =>
+              setConfirm({
+                title: `Remove ${name}'s adventure?`,
+                body: <p>{name}'s recorded nights, stars, prizes and dino will be removed everywhere this game is shared. This can't be undone (unless you exported a backup).</p>,
+                confirm: 'Remove',
+                tone: 'danger',
+                onConfirm: () => removeCurrentChild(),
+              })
+            }
+          >
+            Remove {name}
           </button>
         </section>
 

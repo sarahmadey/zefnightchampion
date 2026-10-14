@@ -19,7 +19,7 @@ await page.waitForTimeout(5000);
 let shot = 0;
 const snap = async (name) => page.screenshot({ path: `scripts/out/${tag}-${String(shot++).padStart(2, '0')}-${name}.png`, timeout: 120000 });
 await snap('splash');
-await page.getByRole('button', { name: 'Tap to start' }).click();
+await page.getByRole('button', { name: "Zef's adventure!" }).click();
 await page.waitForTimeout(1500);
 await snap('greet');
 await page.waitForFunction(() => window.__dino.game().phase === 'ask', null, { timeout: 60000 });

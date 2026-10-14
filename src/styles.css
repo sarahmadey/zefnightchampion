@@ -571,6 +571,20 @@ summary {
   color: var(--ink-soft);
 }
 
+.status-line {
+  margin: 12px 0 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 14px;
+}
+
+.status-line.ok::before {
+  content: '✓ ';
+  font-weight: 800;
+  color: #2b8a3e;
+}
+
 .danger-zone h2 {
   color: var(--danger);
 }
@@ -742,42 +756,6 @@ summary {
     opacity: 1;
     transform: none;
   }
-}
-
-.splash {
-  position: fixed;
-  inset: 0;
-  z-index: 8;
-  border: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  background: radial-gradient(circle at 50% 45%, rgba(255, 252, 235, 0.55), rgba(255, 240, 200, 0.25) 60%, rgba(0, 0, 0, 0) 100%);
-  font-family: var(--font);
-  cursor: pointer;
-}
-
-.splash-sun {
-  width: min(52vw, 260px);
-  height: min(52vw, 260px);
-  animation: wobble 2.2s ease-in-out infinite;
-  filter: drop-shadow(0 10px 18px rgba(200, 120, 0, 0.35));
-}
-
-.splash-text {
-  font-size: clamp(24px, 7vw, 38px);
-  font-weight: 800;
-  color: #fff;
-  text-shadow: 0 3px 0 #d9480f, 0 6px 16px rgba(120, 40, 0, 0.4);
-}
-
-@keyframes wobble {
-  0%, 100% { transform: rotate(-6deg) scale(1); }
-  50% { transform: rotate(6deg) scale(1.06); }
 }
 
 .morning {
@@ -968,6 +946,175 @@ summary {
   font-size: 13px;
   background: #fffdf7;
   color: #26341f;
+}
+
+/* ------------------------------------------------------------- title screen */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.hud > .title-logo {
+  position: absolute;
+  top: calc(max(12px, env(safe-area-inset-top)) + 58px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  pointer-events: none;
+  text-align: center;
+  font-family: var(--font);
+  font-weight: 900;
+  line-height: 0.92;
+  animation: title-in 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.logo-dino {
+  display: block;
+  font-size: clamp(64px, 19vw, 112px);
+  letter-spacing: 0.02em;
+  color: #ffd43b;
+  -webkit-text-stroke: 3px #8a3a00;
+  paint-order: stroke fill;
+  text-shadow: 0 5px 0 #e8590c, 0 9px 0 #a63d00, 0 14px 22px rgba(60, 30, 0, 0.35);
+}
+
+.logo-dino span {
+  display: inline-block;
+  animation: letter-bob 2.4s ease-in-out infinite;
+}
+
+.logo-quest {
+  display: block;
+  margin-top: 6px;
+  font-size: clamp(28px, 8.4vw, 50px);
+  color: #ffffff;
+  -webkit-text-stroke: 2px #1b5e2a;
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 #2b8a3e, 0 6px 0 #1b5e2a, 0 10px 18px rgba(0, 40, 10, 0.35);
+}
+
+@keyframes letter-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-8px) rotate(3deg); }
+}
+
+@keyframes title-in {
+  from { opacity: 0; transform: scale(0.6) translateY(-20px); }
+  to { opacity: 1; transform: none; }
+}
+
+.title-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(440px, 100%);
+  animation: rise 0.5s ease both;
+}
+
+.title-btn {
+  font-family: var(--font);
+  cursor: pointer;
+  touch-action: manipulation;
+  border: none;
+}
+
+.title-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.title-btn:focus-visible {
+  outline: 5px solid #4dabf7;
+  outline-offset: 4px;
+}
+
+.title-btn.start {
+  min-width: min(300px, 80vw);
+  min-height: 88px;
+  padding: 14px 40px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #69db7c, #2f9e44);
+  box-shadow: 0 8px 0 #237032, 0 14px 30px rgba(20, 80, 30, 0.35);
+  color: #fff;
+  font-size: clamp(32px, 9vw, 44px);
+  font-weight: 900;
+  text-shadow: 0 2px 0 rgba(0, 60, 10, 0.35);
+  animation: rise 0.5s ease both, breathe 1.6s ease-in-out 0.5s infinite;
+}
+
+.title-btn.kid {
+  width: 100%;
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 22px 8px 10px;
+  border-radius: 999px;
+  background: #fffdf7;
+  box-shadow: 0 6px 0 color-mix(in srgb, var(--dino, #5cc461) 70%, #000 30%), 0 12px 24px rgba(20, 60, 20, 0.28);
+  color: #24402a;
+  font-size: clamp(22px, 6.2vw, 28px);
+  font-weight: 800;
+  text-align: left;
+}
+
+.title-btn.kid:active,
+.title-btn.start:active {
+  transform: translateY(5px);
+}
+
+.kid-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 58px;
+  border-radius: 999px;
+  background: var(--dino-belly, #e9f7b8);
+}
+
+.kid-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title-btn.add {
+  min-height: 48px;
+  padding: 8px 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #2b6a2f;
+  font-size: 17px;
+  font-weight: 800;
+  box-shadow: 0 3px 10px rgba(20, 60, 20, 0.2);
+}
+
+.title-note {
+  margin: 0 0 20px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #2b6a2f;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.setup-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.setup-actions .btn {
+  flex: 1;
 }
 
 /* ------------------------------------------------------------- setup */
@@ -1185,7 +1332,9 @@ summary {
 
 @media (prefers-reduced-motion: reduce) {
   .big-btn .big-icon,
-  .splash-sun,
+  .logo-dino span,
+  .title-btn.start,
+  .collect-btn,
   .star-counter.glow,
   .meter.glow {
     animation: none;

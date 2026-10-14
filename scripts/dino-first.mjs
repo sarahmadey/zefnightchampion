@@ -1,4 +1,4 @@
-// First look: load fresh, walk through setup, then a seeded board.
+// First look: load fresh, start from the title screen, walk through setup.
 import { chromium } from 'playwright';
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 const size = process.argv[2] === 'tablet' ? { width: 1024, height: 768 } : { width: 390, height: 844 };
@@ -10,7 +10,11 @@ page.on('console', (m) => { const t = m.text(); if (!/vite|DevTools|THREE.Clock|
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 await page.goto('http://127.0.0.1:5173/?debug', { waitUntil: 'load' });
 await page.waitForTimeout(6000);
+await page.screenshot({ path: `scripts/out/d-${tag}-00-title.png`, timeout: 120000 });
+await page.getByRole('button', { name: 'Start!' }).click({ force: true });
+await page.waitForTimeout(800);
 await page.screenshot({ path: `scripts/out/d-${tag}-01-name.png`, timeout: 120000 });
+await page.getByPlaceholder('Name').fill('Zef');
 await page.getByRole('button', { name: /Next/ }).click();
 await page.waitForTimeout(4000);
 await page.screenshot({ path: `scripts/out/d-${tag}-02-dino.png`, timeout: 120000 });

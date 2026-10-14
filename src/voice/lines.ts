@@ -1,8 +1,9 @@
 // Everything Coach Rex says. Each line is recorded ahead of time into an
 // audio clip (see scripts/voice/generate.py), so the game never synthesises
-// speech while it runs. Lines that say Zef's name have a name-free twin used
-// if a grown-up changes the name, and lines that say "twenty nights" have a
-// twin without the number for when a grown-up changes the goal.
+// speech while it runs. Lines that say Zef's name (or call him "big guy")
+// have a name-free twin for any other child, and lines that say "twenty
+// nights" have a twin without the number for when a grown-up changes the
+// goal.
 
 export interface Line {
   text: string;
@@ -17,7 +18,10 @@ export const SPOKEN_GOAL = 20;
 
 export const LINES: Record<string, Line> = {
   // ---------------------------------------------------------- first time
-  'intro-1': { text: "Hey, big guy! I'm Coach Rex! I heard you're on a super important mission!" },
+  'intro-1': {
+    text: "Hey, big guy! I'm Coach Rex! I heard you're on a super important mission!",
+    nameless: "Hey, superstar! I'm Coach Rex! I heard you're on a super important mission!",
+  },
   'intro-2': { text: "You're learning to stay dry at night, so you can wear underwear to bed instead of diapers! That's a big deal! And you know what? I know you can do it!" },
   'intro-3': { text: "Here's how it works. Every morning, you press a button. Dry night? You get a big shiny star, and we hop ahead on our adventure!" },
   'intro-4': { text: "Not dry? That's okay! You get a big dino hug, and we'll try again!" },
@@ -37,9 +41,9 @@ export const LINES: Record<string, Line> = {
   'color-done': { text: "Looking good! Let's go!" },
 
   // ---------------------------------------------------------- mornings
-  'greet-1': { text: 'Good morning, Zef!', nameless: 'Good morning, big guy!' },
+  'greet-1': { text: 'Good morning, Zef!', nameless: 'Good morning, superstar!' },
   'greet-2': { text: 'Rise and shine, Zef!', nameless: 'Rise and shine, buddy!' },
-  'greet-3': { text: 'Good morning, big guy!' },
+  'greet-3': { text: 'Good morning, big guy!', nameless: 'Good morning, sunshine!' },
   ask: { text: 'Did you stay dry last night? Press the sun if you did, or the heart for a big hug!' },
   'ask-short': { text: 'Did you stay dry last night?' },
   already: { text: 'Hey, Zef! You already pressed the button today. See you tomorrow morning!', nameless: 'Hey, buddy! You already pressed the button today. See you tomorrow morning!' },
@@ -47,7 +51,7 @@ export const LINES: Record<string, Line> = {
   // ---------------------------------------------------------- dry
   'dry-1': { text: 'Yes! You stayed dry! Woo-hoo!' },
   'dry-2': { text: "Dry night! That's what I'm talking about!" },
-  'dry-3': { text: 'Whoa, you did it! Way to go, big guy!' },
+  'dry-3': { text: 'Whoa, you did it! Way to go, big guy!', nameless: 'Whoa, you did it! Way to go, superstar!' },
   'dry-4': { text: "Dry again! You're a superstar!" },
   'dry-5': { text: 'Boom! Another dry night! Yeah, buddy!' },
   'dry-6': { text: "Yeah! You're doing amazing, Zef!", nameless: "Yeah! You're doing amazing, buddy!" },
@@ -66,7 +70,7 @@ export const LINES: Record<string, Line> = {
   'acc-bowtie': { text: 'A bow tie! So fancy!' },
   'acc-cowboy': { text: 'A cowboy hat! Yee-haw!' },
   'acc-cape': { text: 'A superhero cape! Super dino!' },
-  'acc-crown': { text: "A crown! You're the king of the dinos!" },
+  'acc-crown': { text: "A crown! You're the king of the dinos!", nameless: "A crown! You're dino royalty!" },
   'acc-basketball': { text: 'A basketball! Swish!' },
   'acc-propeller': { text: 'A propeller hat! Up, up and away!' },
   'acc-medal': { text: 'A gold medal! Number one!' },
@@ -128,13 +132,13 @@ export const LINES: Record<string, Line> = {
   'store-done': { text: "Now you and your dino can both wear underwear at night! Go show your grown-up! I'm so proud of you!" },
 
   // ---------------------------------------------------------- not dry
-  'wet-1': { text: "Hey, that's okay, big guy. Your body's still practicing." },
+  'wet-1': { text: "Hey, that's okay, big guy. Your body's still practicing.", nameless: "Hey, that's okay, buddy. Your body's still practicing." },
   'wet-2': { text: 'Come here! Big dino hug! My arms are tiny, but my hugs are huge!' },
   'wet-3': { text: "And look! You still have all your stars! Tonight's a brand new try!" },
   'wet-4': { text: "No worries, buddy. Every dino has nights like that. You're still my favorite dino!" },
 
   // ---------------------------------------------------------- goodbye
-  'bye-1': { text: 'See you tomorrow morning, big guy!' },
+  'bye-1': { text: 'See you tomorrow morning, big guy!', nameless: 'See you tomorrow morning, superstar!' },
   'bye-2': { text: 'Have an awesome day, Zef! See you tomorrow!', nameless: 'Have an awesome day, buddy! See you tomorrow!' },
   'bye-3': { text: "Don't forget to go potty before bed! See you in the morning!" },
 

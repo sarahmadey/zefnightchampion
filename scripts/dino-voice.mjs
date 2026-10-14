@@ -10,7 +10,7 @@ await page.waitForTimeout(2000);
 await page.evaluate(() => window.__dino.seed(3));
 await page.reload({ waitUntil: 'load' });
 await page.waitForTimeout(4500);
-await page.getByRole('button', { name: 'Tap to start' }).click();
+await page.getByRole('button', { name: "Zef's adventure!" }).click();
 const samples = [];
 for (let i = 0; i < 14; i++) {
   await page.waitForTimeout(500);

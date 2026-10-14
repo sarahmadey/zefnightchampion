@@ -12,7 +12,7 @@ await page.waitForTimeout(2500);
 await page.evaluate((n) => window.__dino.seed(n), Number(seedArg));
 await page.reload({ waitUntil: 'load' });
 await page.waitForTimeout(6000);
-await page.getByRole('button', { name: 'Tap to start' }).click();
+await page.getByRole('button', { name: "Zef's adventure!" }).click();
 await page.waitForFunction(() => window.__dino && window.__dino.game().phase === 'ask', null, { timeout: 90000 }).catch(async (e) => console.log('wait failed', e.message, logs.join(' | '), JSON.stringify(await page.evaluate(() => { const g = window.__dino?.game(); return g ? { phase: g.phase, scene: g.scene, cut: g.cutscene, awaiting: g.awaiting, cap: g.caption?.text } : 'no api'; }))));
 await page.waitForTimeout(1500);
 await page.addStyleTag({ content: '#root *{visibility:hidden !important} #root canvas{visibility:visible !important}' });

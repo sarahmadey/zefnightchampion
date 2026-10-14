@@ -12,7 +12,7 @@ await page.waitForTimeout(2000);
 await page.evaluate(() => window.__dino.seed(3));
 await page.reload({ waitUntil: 'load' });
 await page.waitForTimeout(4500);
-await page.getByRole('button', { name: 'Tap to start' }).click();
+await page.getByRole('button', { name: "Zef's adventure!" }).click();
 await page.waitForFunction(() => window.__dino.game().phase === 'ask', null, { timeout: 60000 });
 await page.getByRole('button', { name: /Dry! I stayed dry/ }).click();
 await page.waitForTimeout(2500);
@@ -21,13 +21,13 @@ console.log('mid-event', JSON.stringify(await st()));
 await page.reload({ waitUntil: 'load' });
 await page.waitForTimeout(4500);
 console.log('after refresh (splash)', JSON.stringify(await st()));
-await page.getByRole('button', { name: 'Tap to start' }).click();
+await page.getByRole('button', { name: "Zef's adventure!" }).click();
 await page.waitForFunction(() => { const g = window.__dino.game(); return g.phase === 'done' && !g.cutscene; }, null, { timeout: 150000 });
 console.log('caught up', JSON.stringify(await st()));
 // another refresh: no replay, just "already"
 await page.reload({ waitUntil: 'load' });
 await page.waitForTimeout(4500);
-await page.getByRole('button', { name: 'Tap to start' }).click();
+await page.getByRole('button', { name: "Zef's adventure!" }).click();
 await page.waitForTimeout(1500);
 const captions = [];
 for (let i = 0; i < 12; i++) { await page.waitForTimeout(600); const c = await page.evaluate(() => window.__dino.game().caption?.text); if (c && !captions.includes(c)) captions.push(c); }

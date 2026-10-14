@@ -209,7 +209,10 @@ export function normalizeSave(raw: unknown, now: Date = new Date()): SaveData | 
       pick: Number.isInteger(upRaw.pick) && (upRaw.pick as number) >= 0 && (upRaw.pick as number) < UNDERPANTS.length ? (upRaw.pick as number) : null,
     },
     profile: {
-      name: typeof profileRaw.name === 'string' && profileRaw.name.trim() ? profileRaw.name.trim().slice(0, 24) : base.profile.name,
+      name:
+        typeof profileRaw.name === 'string' && (profileRaw.name.trim() || profileRaw.setupDone !== true)
+          ? profileRaw.name.trim().slice(0, 24)
+          : base.profile.name,
       species,
       color: int(profileRaw.color, 0, DINO_COLORS.length - 1, 0),
       setupDone: profileRaw.setupDone === true,
@@ -232,7 +235,7 @@ export function normalizeSave(raw: unknown, now: Date = new Date()): SaveData | 
   return applyDerived(data);
 }
 
-function storage(): Storage | null {
+export function storage(): Storage | null {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return null;
     return window.localStorage;
@@ -242,8 +245,13 @@ function storage(): Storage | null {
 }
 
 export function loadSave(now: Date = new Date()): SaveData {
+  return readLegacySave(now) ?? defaultSave(now);
+}
+
+/** The one-child save the game kept before it had room for several children, if any. */
+export function readLegacySave(now: Date = new Date()): SaveData | null {
   const s = storage();
-  if (!s) return defaultSave(now);
+  if (!s) return null;
   for (const key of [STORAGE_KEY, BACKUP_KEY]) {
     try {
       const text = s.getItem(key);
@@ -254,7 +262,7 @@ export function loadSave(now: Date = new Date()): SaveData {
       /* try the next copy */
     }
   }
-  return defaultSave(now);
+  return null;
 }
 
 export function persistSave(data: SaveData): boolean {
@@ -301,13 +309,13 @@ export function newQuest(data: SaveData, now: Date = new Date()): SaveData {
 }
 
 /**
- * Back to the very first screen: the name, a new dino and the intro, with
- * nothing recorded. Only the grown-up's own choices stay: the prize list, the
- * goal and the sound settings.
+ * Back to the very first screen: the name (filled in, ready to change), a
+ * new dino and the intro, with nothing recorded. Only the grown-up's own
+ * choices stay: the prize list, the goal and the sound settings.
  */
 export function startOver(data: SaveData, now: Date = new Date()): SaveData {
   const fresh = defaultSave(now);
-  return { ...fresh, settings: data.settings, prizes: data.prizes, rules: data.rules };
+  return { ...fresh, profile: { ...fresh.profile, name: data.profile.name }, settings: data.settings, prizes: data.prizes, rules: data.rules };
 }
 
 export function exportBackup(data: SaveData, now: Date = new Date()): string {

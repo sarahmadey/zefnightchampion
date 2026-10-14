@@ -7,11 +7,12 @@ import * as THREE from 'three';
 import { Board } from './board/Board';
 import { StoreScene } from './store/StoreScene';
 import { SetupStage } from './setup/SetupStage';
+import { TitleStage } from './setup/TitleStage';
 import { CameraRig } from './game/CameraRig';
 import { Particles } from './three/Particles';
 import { clock, frameDt } from './game/actors';
 import { useGame, useSave } from './state/store';
-import { boot, checkProgress, updateTalk } from './game/director';
+import { boot, checkProgress, showTitle, updateTalk } from './game/director';
 import { sharedTime } from './three/shaders';
 import { Overlay } from './ui/Overlay';
 import { applyMotionSetting } from './game/settings';
@@ -54,6 +55,12 @@ function DirectorHooks() {
       return () => clearTimeout(t);
     }
   }, [ready, parentOpen, preview, records, rules, token, busy]);
+  // a grown-up on another device removed this child: back to the title screen
+  const current = useSave((s) => s.library.current);
+  const phase = useGame((s) => s.phase);
+  useEffect(() => {
+    if (!current && phase !== 'title' && phase !== 'boot') showTitle();
+  }, [current, phase]);
   return null;
 }
 
@@ -71,6 +78,7 @@ function Scenes() {
   const scene = useGame((s) => s.scene);
   if (scene === 'store') return <StoreScene />;
   if (scene === 'setup') return <SetupStage />;
+  if (scene === 'title') return <TitleStage />;
   return <Board />;
 }
 

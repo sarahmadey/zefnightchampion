@@ -1,12 +1,10 @@
-// Zustand stores: the persisted save and the transient game/UI state.
+// Zustand stores: the saved adventures and the transient game/UI state.
 
 import { create } from 'zustand';
 import {
   applyDerived,
   clampGoal,
-  loadSave,
   newQuest,
-  persistSave,
   seenFromRecords,
   startOver,
   withRecord,
@@ -15,12 +13,40 @@ import {
   type Seen,
   type Settings,
 } from './save';
+import {
+  childOrder,
+  loadLibrary,
+  mergeCloud,
+  newChildId,
+  newChildSave,
+  persistLibrary,
+  sameContent,
+  type CloudDoc,
+  type Library,
+} from './library';
 import { computeQuest, type DateKey, type NightResult, type QuestState } from './progress';
 import type { Prize, Slot } from '../game/rewards';
 
+/**
+ * Where progress is kept: `on` = online with the family's copy (follows the
+ * grown-up's Claude account), `guest` = this person can look but not save
+ * online (kept on this device), `off` = this device only, `connecting` =
+ * still finding out.
+ */
+export type CloudStatus = 'off' | 'connecting' | 'on' | 'guest';
+
+/** The cloud module plugs in here, so the store can ask it to send changes. */
+export const cloudHooks = {
+  upload: (_id: string) => undefined as void,
+  tombstone: (_id: string) => undefined as void,
+};
+
 interface SaveStore {
+  /** the current child's save, with this device's sound settings */
   data: SaveData;
+  library: Library;
   storageOk: boolean;
+  cloud: CloudStatus;
   record: (date: DateKey, result: NightResult | null) => void;
   setSettings: (patch: Partial<Settings>) => void;
   setProfile: (patch: Partial<Profile>) => void;
@@ -34,24 +60,66 @@ interface SaveStore {
   replace: (data: SaveData) => void;
   startNewQuest: () => void;
   startOver: () => void;
+  /** play as this child from now on */
+  selectChild: (id: string) => void;
+  /** a new child, not set up yet, who becomes the current one */
+  addChild: () => string;
+  /** take a child out of the game (online too) */
+  removeChild: (id: string) => void;
+  /** fold in the online copies */
+  applyCloud: (docs: CloudDoc[], definitive: boolean) => void;
+  setCloud: (status: CloudStatus) => void;
+  /** the online copy now has this version of a child */
+  markUploaded: (id: string, updatedAt: string) => void;
+  /** the online copy knows this child was removed */
+  markTombstoned: (id: string) => void;
 }
 
-function commit(data: SaveData): boolean {
-  return persistSave(data);
+/** The save the game shows: the current child, or an empty one before any child exists. */
+function currentData(lib: Library): SaveData {
+  const c = lib.current ? lib.children[lib.current] : null;
+  return { ...(c ? c.data : newChildSave()), settings: lib.settings };
 }
+
+/** Should this child go online yet? Not a blank one nobody has named. */
+export function worthUploading(d: SaveData): boolean {
+  return d.profile.name.trim() !== '' || Object.keys(d.records).length > 0;
+}
+
+const initialLibrary = loadLibrary();
 
 export const useSave = create<SaveStore>((set, get) => {
-  const put = (next: SaveData) => set({ data: next, storageOk: commit(next) });
+  const commit = (library: Library, data?: SaveData) => set({ library, data: data ?? currentData(library), storageOk: persistLibrary(library) });
+  const put = (next: SaveData) => {
+    const { library } = get();
+    const id = library.current;
+    const prev = id ? library.children[id] : null;
+    if (!id || !prev) {
+      set({ data: { ...next, settings: library.settings } });
+      return;
+    }
+    if (sameContent(prev.data, next)) {
+      set({ data: { ...next, settings: library.settings } });
+      return;
+    }
+    const stamped: SaveData = { ...next, updatedAt: new Date().toISOString(), settings: library.settings };
+    commit({ ...library, children: { ...library.children, [id]: { ...prev, data: stamped, dirty: true } } }, stamped);
+    if (worthUploading(stamped)) cloudHooks.upload(id);
+  };
   return {
-    data: loadSave(),
+    data: currentData(initialLibrary),
+    library: initialLibrary,
     storageOk: true,
+    cloud: 'off',
     record(date, result) {
       const prev = get().data;
       const next = withRecord(prev, date, result);
       if (next !== prev) put(next);
     },
     setSettings(patch) {
-      put({ ...get().data, settings: { ...get().data.settings, ...patch } });
+      const { library } = get();
+      const settings = { ...library.settings, ...patch };
+      commit({ ...library, settings }, { ...get().data, settings });
     },
     setProfile(patch) {
       put({ ...get().data, profile: { ...get().data.profile, ...patch } });
@@ -96,14 +164,64 @@ export const useSave = create<SaveStore>((set, get) => {
     startOver() {
       put(startOver(get().data));
     },
+    selectChild(id) {
+      const { library } = get();
+      if (!library.children[id]) return;
+      commit({ ...library, current: id });
+    },
+    addChild() {
+      const { library } = get();
+      const id = newChildId();
+      const data = { ...newChildSave(), settings: library.settings };
+      commit({ ...library, current: id, children: { ...library.children, [id]: { data, dirty: true } } });
+      return id;
+    },
+    removeChild(id) {
+      const { library } = get();
+      if (!library.children[id]) return;
+      const children = { ...library.children };
+      const wasOnline = worthUploading(children[id].data);
+      delete children[id];
+      const removed = wasOnline ? [...library.removed.filter((x) => x !== id), id].slice(-50) : library.removed;
+      commit({ ...library, children, removed, current: library.current === id ? null : library.current });
+      if (wasOnline) cloudHooks.tombstone(id);
+    },
+    applyCloud(docs, definitive) {
+      const { library } = get();
+      const res = mergeCloud(library, docs, definitive);
+      const before = library.current ? library.children[library.current]?.data : null;
+      const after = res.lib.current ? res.lib.children[res.lib.current]?.data : null;
+      commit(res.lib, before === after ? get().data : undefined);
+      for (const id of res.upload) if (worthUploading(res.lib.children[id].data)) cloudHooks.upload(id);
+      for (const id of res.tombstones) cloudHooks.tombstone(id);
+    },
+    setCloud(status) {
+      set({ cloud: status });
+    },
+    markUploaded(id, updatedAt) {
+      const { library } = get();
+      const c = library.children[id];
+      if (!c || !c.dirty || c.data.updatedAt !== updatedAt) return;
+      commit({ ...library, children: { ...library.children, [id]: { data: c.data, dirty: false } } }, get().data);
+    },
+    markTombstoned(id) {
+      const { library } = get();
+      if (!library.removed.includes(id)) return;
+      commit({ ...library, removed: library.removed.filter((x) => x !== id) }, get().data);
+    },
   };
 });
+
+/** The children on this device, oldest adventure first. */
+export function childList(lib: Library): { id: string; data: SaveData }[] {
+  return childOrder(lib).map((id) => ({ id, data: lib.children[id].data }));
+}
 
 /** What the morning screen and the 3D board are showing. */
 export type Phase =
   | 'boot'
-  | 'setup' // first-time: name, pick a dino, the mission
-  | 'splash' // tap the egg to start (unlocks sound)
+  | 'title' // the title screen: pick whose adventure (the tap also wakes the sound)
+  | 'setup' // a new child: name, pick a dino, the mission
   | 'ask' // the two big buttons
   | 'event' // a celebration, hug, prize or store visit is playing
   | 'done'; // today is recorded: see you tomorrow
@@ -122,13 +240,15 @@ export interface Caption {
   who: 'coach' | 'zef';
 }
 
-export type SceneId = 'board' | 'store' | 'setup';
+export type SceneId = 'board' | 'store' | 'setup' | 'title';
 export type SetupStep = 'name' | 'dino' | 'color';
 
 interface GameStore {
   phase: Phase;
   scene: SceneId;
   setupStep: SetupStep | null;
+  /** the setup can go back to the title screen (adding a child, not starting over) */
+  setupBack: boolean;
   /** accessories the board shows as unlocked (the egg reveals the newest) */
   shownAccessories: number;
   /** chests the board shows as opened */
@@ -169,6 +289,7 @@ export const useGame = create<GameStore>((set) => ({
   phase: 'boot',
   scene: 'board',
   setupStep: null,
+  setupBack: false,
   shownAccessories: 0,
   openedChests: 0,
   showUnderpants: true,

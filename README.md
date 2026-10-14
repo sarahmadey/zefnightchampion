@@ -15,9 +15,19 @@ drive. Coach Rex's voice is pre-recorded into small audio clips that ship
 with the game. The game loads nothing from the internet and makes no AI
 calls while it runs.
 
+## The title screen
+
+The game opens like a video game: the name in big letters over a little
+stage where Coach Rex stands with every child's dino, each wearing what
+they've collected. The very first time there's one big **Start!** button.
+After that there's a button for each child ("Zef's adventure!", with a
+picture of their dino so a child who can't read yet can find their own) and
+**+ Add new child**. Each child has their own dino, stars, prizes, meter
+and goal.
+
 ## The morning
 
-1. **Tap to start.** Coach Rex says good morning.
+1. **Tap your adventure.** Coach Rex says good morning.
 2. **Press a button.**
    - **Dry!** A big star flies onto the next stepping stone, Zef's dino
      hops onto it, the underwear meter ticks up, and one surprise plays.
@@ -58,11 +68,11 @@ buttons are showing.
 A morning with no record is unknown. It never counts as dry or not dry: it
 doesn't add a star and doesn't reset the meter.
 
-## First time
+## A new child
 
-1. A grown-up enters the name (Zef).
-2. Zef picks his dino (T. rex, triceratops, stegosaurus or long-neck) and
-   its color.
+1. A grown-up enters the child's name.
+2. The child picks their dino (T. rex, triceratops, stegosaurus or
+   long-neck) and its color.
 3. Coach Rex explains the mission: stay dry at night so you can wear
    underwear to bed instead of diapers; a star for every dry morning and
    treasure chests with prizes along the way; a hug for a not-dry night; the
@@ -88,11 +98,38 @@ multiplication question. In the parent corner you can:
 - change the name, dino and color, and turn sound, music and reduced motion
   on or off
 - back up and restore (old candy-castle backups bring their nights along)
-- start a new quest (keeps the dino), or start over from the very
-  beginning: back to the name screen, picking a dino and the intro (keeps
-  only the prize list, the goal and the sound settings)
+- see where progress is saved, how to share the game, and switch to
+  another child or add one
+- start a new quest (keeps the dino), start a child's adventure over from
+  the very beginning (the name screen, picking a dino and the intro), or
+  remove a child from the game
 
-Progress is saved in this browser's local storage.
+## Saving and sharing
+
+Inside the claude.ai artifact viewer, every child's adventure is saved in
+the page's own online database (one document per child), so it follows the
+grown-up's Claude account instead of one phone. Each device also keeps a
+copy in the browser, so the game opens instantly and keeps working offline;
+the two line up whenever the page is open (every recorded morning from both
+is kept, and a child removed on one device is removed on the others).
+
+Who sees what is set by the page's Share menu and the database rules
+declared when it's published (only the owner and people at Contributor or
+Editor level read or write the adventures):
+
+- **Family** (another parent, a grandparent): invite them by email as an
+  Editor. Signed in to Claude, they see the same adventures live and can
+  press the morning button on their own phone.
+- **Other families**: invite them by email as a Viewer. They can start
+  adventures for their own children, which stay on their own device, and
+  never see the family's.
+- Leave the public link off: while it's on, family invited by email lose
+  access to the shared adventures.
+
+Outside the viewer (a saved copy, the dev server) the game saves in the
+browser only. An old one-child save from before is brought over as the
+first child, and joins the online child of the same name if another device
+put them online first.
 
 ## Coach Rex's voice
 
@@ -105,7 +142,8 @@ Every clip is checked before it's kept: a speech recognizer (Whisper) must
 hear the right words, and a voice classifier must still hear a man; a clip
 that fails is re-recorded. Re-running only re-records lines that changed.
 Lines that say "Zef" have name-free twins ("buddy") used if the name is
-changed, and lines that say "twenty nights" have number-free twins used if
+changed (or call him "big guy": other children are "superstar" or
+"buddy"), and lines that say "twenty nights" have number-free twins used if
 the goal is changed. Clips for lines that no longer exist are removed.
 
 To use a different voice, replace the clips with files of the same names.
@@ -131,20 +169,23 @@ npm run build:single # one self-contained HTML file in dist-single/
 `?debug` in the URL exposes a small test API on `window.__dino`. With it
 you can seed nights, press the buttons, run previews, and project dinos and
 props to screen positions. The `scripts/dino-*.mjs` files use it with
-Playwright to play through setup, mornings, chests, the store and the
-parent corner.
+Playwright to play through the title screen, setup, mornings, chests, the
+store and the parent corner. `scripts/dino-sync.mjs` stands in for the
+viewer's database to check that two family devices stay in step and that a
+Viewer's adventures stay separate.
 
 ### Layout
 
-- `src/state`: dates, stars, the meter, prizes, save data, import/export
-  (pure and unit tested)
+- `src/state`: dates, stars, the meter, prizes, save data, import/export,
+  the library of children and how it lines up with the online copy (pure
+  and unit tested), plus `cloud.ts`, which talks to the viewer's database
 - `src/game`: the director (every morning event), actors, camera, rewards
 - `src/dino`: the sculpting kit (`sdf.ts`), skin shader, the sculpted T. rex
   and four-legged dinos, the animator, accessories, underwear
 - `src/board`: the lands, path, chests, plants and rocks (`nature.ts`),
   landmarks, sky and lights
 - `src/store`: the Underwear Store
-- `src/setup`: the pick-your-dino stage
+- `src/setup`: the title screen's stage and the pick-your-dino stage
 - `src/voice`: Coach Rex's lines and the clip player
 - `src/audio`: sound effects and music, all synthesized
 - `src/ui`: the big buttons, the meter, captions and the parent corner

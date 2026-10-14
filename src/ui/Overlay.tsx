@@ -5,10 +5,25 @@
 // controls hide behind the moon button.
 
 import { useEffect, useRef, useState } from 'react';
-import { useGame, useQuest, useSave } from '../state/store';
-import { collectPrize, endPreview, pressDry, pressWet, replayToday, setupDone, setupNameDone, setupPickColor, setupPickSpecies, skipIntro, startFromSplash } from '../game/director';
+import { childList, useGame, useQuest, useSave } from '../state/store';
+import {
+  addChildFromTitle,
+  collectPrize,
+  endPreview,
+  playChild,
+  pressDry,
+  pressWet,
+  replayToday,
+  setupBack,
+  setupDone,
+  setupNameDone,
+  setupPickColor,
+  setupPickSpecies,
+  skipIntro,
+} from '../game/director';
+import { DinoBadge } from './DinoBadge';
 import { ParentButton, ParentPanel } from './ParentArea';
-import { ArrowIcon, BigHeartIcon, BigSunIcon, ChestIcon, ReplayIcon, SoundOffIcon, SoundOnIcon, StarIcon, UnderpantsIcon } from './icons';
+import { ArrowIcon, BigHeartIcon, ChestIcon, ReplayIcon, SoundOffIcon, SoundOnIcon, StarIcon, UnderpantsIcon, BigSunIcon } from './icons';
 import { landRange, landOf } from '../state/progress';
 import { DINO_COLORS, SPECIES } from '../game/rewards';
 import { setSoundOn } from '../audio/core';
@@ -107,17 +122,84 @@ function Caption() {
   );
 }
 
-function Splash() {
+/** "Zef's adventure!" (or "James' adventure!"). */
+function possessive(name: string): string {
+  const n = name.trim();
+  return /s$/i.test(n) ? `${n}'` : `${n}'s`;
+}
+
+/** The children on the title screen: everyone with a name. */
+function useTitleKids() {
+  const library = useSave((s) => s.library);
+  return childList(library).filter((c) => c.data.profile.name.trim());
+}
+
+/** The name of the game, big, over the stage. */
+function TitleLogo() {
+  const phase = useGame((s) => s.phase);
+  if (phase !== 'title') return null;
+  return (
+    <h1 className="title-logo">
+      <span className="logo-dino" aria-hidden>
+        {'Dino'.split('').map((ch, i) => (
+          <span key={i} style={{ animationDelay: `${i * 0.12}s` }}>
+            {ch}
+          </span>
+        ))}
+      </span>
+      <span className="logo-quest" aria-hidden>
+        Underwear Quest
+      </span>
+      <span className="sr-only">Dino Underwear Quest</span>
+    </h1>
+  );
+}
+
+/** Start (the very first time), or one button per child plus "Add new child". */
+function TitleButtons() {
   const phase = useGame((s) => s.phase);
   const ready = useGame((s) => s.ready);
-  if (phase !== 'splash') return null;
+  const cloud = useSave((s) => s.cloud);
+  const kids = useTitleKids();
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setWaited(true), 6000);
+    return () => clearTimeout(t);
+  }, []);
+  if (phase !== 'title') return null;
+  if (!kids.length && cloud === 'connecting' && !waited) {
+    return <p className="title-note">Finding your adventures...</p>;
+  }
+  if (!kids.length) {
+    return (
+      <button className="title-btn start" disabled={!ready} onClick={() => addChildFromTitle()}>
+        {ready ? 'Start!' : 'Waking up the dinos...'}
+      </button>
+    );
+  }
   return (
-    <button className="splash" onClick={() => startFromSplash()} disabled={!ready} aria-label="Tap to start">
-      <span className="splash-sun">
-        <BigSunIcon />
-      </span>
-      <span className="splash-text">{ready ? 'Tap to start!' : 'Waking up the dinos...'}</span>
-    </button>
+    <div className="title-buttons" role="group" aria-label="Whose adventure?">
+      {kids.map((k) => {
+        const color = DINO_COLORS[k.data.profile.color] ?? DINO_COLORS[0];
+        return (
+          <button
+            key={k.id}
+            className="title-btn kid"
+            disabled={!ready}
+            style={{ ['--dino' as string]: color.body, ['--dino-belly' as string]: color.belly }}
+            onClick={() => playChild(k.id)}
+          >
+            <span className="kid-badge">
+              <DinoBadge species={k.data.profile.species} color={color} />
+            </span>
+            <span className="kid-name">{possessive(k.data.profile.name)} adventure!</span>
+          </button>
+        );
+      })}
+      <button className="title-btn add" disabled={!ready} onClick={() => addChildFromTitle()}>
+        + Add new child
+      </button>
+    </div>
   );
 }
 
@@ -227,25 +309,34 @@ function SkipIntro() {
 
 function SetupName() {
   const name = useSave((s) => s.data.profile.name);
-  const [value, setValue] = useState(name || 'Zef');
+  const canGoBack = useGame((s) => s.setupBack);
+  const [value, setValue] = useState(name);
+  const ok = value.trim().length > 0;
   return (
     <form
       className="setup-card"
       onSubmit={(e) => {
         e.preventDefault();
-        setupNameDone(value);
+        if (ok) setupNameDone(value);
       }}
     >
-      <h1>Dino Underwear Quest</h1>
+      <h1>A new adventure</h1>
       <p className="muted">For grown-ups: who is going on this quest?</p>
       <label className="name-field">
-        <span>Name</span>
-        <input value={value} onChange={(e) => setValue(e.target.value)} maxLength={24} autoComplete="off" />
+        <span>Child's name</span>
+        <input value={value} placeholder="Name" onChange={(e) => setValue(e.target.value)} maxLength={24} autoComplete="off" />
       </label>
       <p className="muted small">Each morning your child presses one big button: the smiling sun for a dry night, the heart for a not-dry night. Coach Rex does the rest. Grown-up controls are behind the moon button.</p>
-      <button className="btn primary big" type="submit">
-        Next <ArrowIcon />
-      </button>
+      <div className="row setup-actions">
+        {canGoBack && (
+          <button className="btn big" type="button" onClick={() => setupBack()}>
+            Back
+          </button>
+        )}
+        <button className="btn primary big" type="submit" disabled={!ok}>
+          Next <ArrowIcon />
+        </button>
+      </div>
     </form>
   );
 }
@@ -319,15 +410,16 @@ export function Overlay() {
         <UnderwearMeter />
         <SkipIntro />
         <Setup />
+        <TitleLogo />
         <div className="dock">
           <Caption />
+          <TitleButtons />
           <CollectButton />
           <MorningButtons />
           <Done />
           <SetupBottom />
         </div>
       </div>
-      <Splash />
       <PreviewBanner />
       <ParentPanel />
     </>

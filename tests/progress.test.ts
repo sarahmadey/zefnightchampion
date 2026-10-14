@@ -261,7 +261,7 @@ describe('save data', () => {
     d = applyDerived(d);
     const n = startOver(d, NOW);
     expect(n.records).toEqual({});
-    expect(n.profile).toEqual(defaultSave(NOW).profile);
+    expect(n.profile).toEqual({ ...defaultSave(NOW).profile, name: 'Milo' });
     expect(n.profile.setupDone).toBe(false);
     expect(n.outfit).toEqual({});
     expect(n.underpants.earned).toBe(false);

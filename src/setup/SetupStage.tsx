@@ -51,20 +51,8 @@ function StageGrass() {
   return <primitive object={mesh} />;
 }
 
-export function SetupStage() {
-  const step = useGame((s) => s.setupStep);
-  const species = useSave((s) => s.data.profile.species);
-  const colorIdx = useSave((s) => s.data.profile.color);
-  const chosenOnly = step === 'color';
-  useEffect(() => {
-    SPECIES.forEach((s, i) => {
-      const a = lineup[s.id];
-      a.visible = !chosenOnly || s.id === species;
-      a.pos.set(SETUP_ORIGIN.x + (chosenOnly ? 0 : (i - 1.5) * 1.62), 0.12, SETUP_ORIGIN.z);
-      a.scale = chosenOnly ? 1.5 : 1.3;
-      a.heading = 0;
-    });
-  }, [chosenOnly, species]);
+/** The little outdoor stage the setup and the title screen share: sky, lights, the round stage, grass and plants. */
+export function StageSet() {
   const scenery = useMemo(() => {
     const out: { geo: THREE.BufferGeometry; pos: [number, number, number]; s: number; r: number }[] = [];
     for (let i = 0; i < 7; i++) {
@@ -94,6 +82,28 @@ export function SetupStage() {
       {scenery.map((s, i) => (
         <mesh key={i} geometry={s.geo} material={vc} position={s.pos} scale={s.s} rotation={[0, s.r, 0]} />
       ))}
+      <Glow color="#fff6c2" size={4} opacity={0.35} position={[SETUP_ORIGIN.x, 1.6, SETUP_ORIGIN.z + 0.5]} />
+    </>
+  );
+}
+
+export function SetupStage() {
+  const step = useGame((s) => s.setupStep);
+  const species = useSave((s) => s.data.profile.species);
+  const colorIdx = useSave((s) => s.data.profile.color);
+  const chosenOnly = step === 'color';
+  useEffect(() => {
+    SPECIES.forEach((s, i) => {
+      const a = lineup[s.id];
+      a.visible = !chosenOnly || s.id === species;
+      a.pos.set(SETUP_ORIGIN.x + (chosenOnly ? 0 : (i - 1.5) * 1.62), 0.12, SETUP_ORIGIN.z);
+      a.scale = chosenOnly ? 1.5 : 1.3;
+      a.heading = 0;
+    });
+  }, [chosenOnly, species]);
+  return (
+    <>
+      <StageSet />
       {SPECIES.map((s) => (
         <group key={s.id}>
           <Dino
@@ -111,7 +121,6 @@ export function SetupStage() {
           />
         </group>
       ))}
-      <Glow color="#fff6c2" size={4} opacity={0.35} position={[SETUP_ORIGIN.x, 1.6, SETUP_ORIGIN.z + 0.5]} />
     </>
   );
 }

@@ -1,6 +1,7 @@
 // The director runs every moment of the morning ritual:
 //
-//   splash -> greeting -> the two big buttons -> a celebration or a hug -> see you tomorrow
+//   title screen (whose adventure?) -> greeting -> the two big buttons
+//   -> a celebration or a hug -> see you tomorrow
 //
 // A dry morning: a star flies to the next stone, Zef's dino hops onto it, the
 // underpants meter ticks up and one surprise plays (an egg with a new
@@ -269,13 +270,12 @@ function today() {
 
 // ------------------------------------------------------------ boot & phases
 
-/** Set the board to what the child has already seen, then decide where to start. */
-export function boot() {
+/** Line the board up with what the current child has already seen. */
+function syncBoard() {
   const d = data();
   const q = computeQuest(d.records, d.rules);
   const shown = Math.min(d.seen.stars, q.stars);
-  const g = useGame.getState();
-  g.set({
+  useGame.getState().set({
     shownStars: shown,
     shownMeter: q.latest?.result === 'wet' && q.latest.date !== d.seen.hugDate ? d.seen.meter : Math.min(d.seen.meter, q.meter),
     shownAccessories: accessoriesUnlocked(shown),
@@ -283,25 +283,104 @@ export function boot() {
     showUnderpants: d.seen.underpants,
     land: landOf(shown, d.rules),
   });
+  for (const a of [hero, coach]) {
+    a.action.name = 'none';
+    a.expression = 'smile';
+    a.look = null;
+    a.visible = true;
+  }
   placeAt(shown);
   boardCamera();
   cam.snap = true;
-  if (!d.profile.setupDone) {
-    g.set({ phase: 'setup', scene: 'setup', setupStep: 'name' });
-    setupCamera();
-    return;
-  }
-  g.set({ phase: 'splash', scene: 'board' });
 }
 
-/** The first tap of the day: wake the sound, say good morning, then ask (or play what's new). */
-export function startFromSplash() {
+/** Put away anything a moment left out (props, the chest, the store visit). */
+function clearProps() {
+  Object.assign(chestAnim, { land: -1, open: 0, rise: 0, wiggle: 0 });
+  fx.egg.visible = false;
+  fx.prize.visible = false;
+  fx.hand.visible = false;
+  fx.ptero.visible = false;
+  fx.star.active = false;
+}
+
+/** The game always opens on the title screen. */
+export function boot() {
+  showTitle();
+}
+
+/** The title screen: the cast on stage, the name of the game, whose adventure. */
+export function showTitle() {
+  cancelCutscene();
+  previewRestore = null;
+  clearProps();
+  music.setMood('play');
+  // a child someone started adding but never named isn't kept
+  const save = useSave.getState();
+  for (const [id, c] of Object.entries(save.library.children)) {
+    if (!c.data.profile.name.trim() && !c.data.profile.setupDone && Object.keys(c.data.records).length === 0) save.removeChild(id);
+  }
+  useGame.getState().set({ phase: 'title', scene: 'title', setupStep: null, setupBack: false, preview: null, parentOpen: false, fade: 0, highlight: null, previewUnderpants: null });
+  titleCamera();
+}
+
+function titleCamera() {
+  const o = new THREE.Vector3(0, 0, -800);
+  shot(o.clone().add(new THREE.Vector3(0, 2.3, 7.6)), o.clone().add(new THREE.Vector3(0, 1.05, -0.4)), 3, 6.2);
+  cam.snap = true;
+}
+
+/** A child's button on the title screen: wake the sound and start their morning. */
+export function playChild(id: string) {
   const g = useGame.getState();
-  if (g.phase !== 'splash') return;
+  if (g.phase !== 'title' || !g.ready) return;
   unlockAudio();
   if (data().settings.music) music.start();
+  sfx.play('tap');
+  useSave.getState().selectChild(id);
+  if (!data().profile.setupDone) {
+    beginSetup(true);
+    return;
+  }
   g.set({ phase: 'event' });
+  startMorning(true);
+}
+
+/** "Add new child" (or "Start" the very first time): set up a new adventure. */
+export function addChildFromTitle() {
+  const g = useGame.getState();
+  if (g.phase !== 'title' || !g.ready) return;
+  unlockAudio();
+  if (data().settings.music) music.start();
+  sfx.play('tap');
+  useSave.getState().addChild();
+  beginSetup(true);
+}
+
+/** Back from the name screen to the title (a child nobody has named yet isn't kept). */
+export function setupBack() {
+  const g = useGame.getState();
+  if (g.setupStep !== 'name' || !g.setupBack) return;
+  showTitle();
+}
+
+function beginSetup(canGoBack: boolean) {
+  useGame.getState().set({ phase: 'setup', scene: 'setup', setupStep: 'name', setupBack: canGoBack, preview: null, parentOpen: false, fade: 0, highlight: null });
+  setupCamera();
+}
+
+/** Say good morning, then ask (or play what's new). From the title, the board fades in first. */
+function startMorning(fromTitle = false) {
+  const g = useGame.getState();
   void runCutscene('greet', async (ctx) => {
+    if (fromTitle) {
+      g.set({ fade: 1 });
+      await ctx.wait(0.45);
+      syncBoard();
+      g.set({ scene: 'board' });
+      await ctx.wait(0.5);
+      g.set({ fade: 0 });
+    }
     placeAt(g.shownStars);
     play(hero, 'stretch', 1.8);
     play(coach, 'wave', 1.6);
@@ -1331,28 +1410,25 @@ async function intro(ctx: Ctx) {
 }
 
 /**
- * A grown-up's "start over": wipe the quest and go back to the very first
- * screen (the name), so the dino picking and the intro play again.
+ * A grown-up's "start over" for the current child: wipe their adventure and
+ * go back to the name screen, so the dino picking and the intro play again.
  */
 export function startOver() {
   cancelCutscene();
   previewRestore = null;
-  Object.assign(chestAnim, { land: -1, open: 0, rise: 0, wiggle: 0 });
-  fx.egg.visible = false;
-  fx.prize.visible = false;
-  fx.hand.visible = false;
-  fx.ptero.visible = false;
-  fx.star.active = false;
+  clearProps();
   music.setMood('play');
-  for (const a of [hero, coach]) {
-    a.action.name = 'none';
-    a.expression = 'smile';
-    a.look = null;
-    a.visible = true;
-  }
   useSave.getState().startOver();
-  useGame.getState().set({ preview: null, parentOpen: false, fade: 0, highlight: null, previewUnderpants: null, setupStep: null });
-  boot();
+  syncBoard();
+  useGame.getState().set({ previewUnderpants: null });
+  beginSetup(false);
+}
+
+/** A grown-up removed the current child: back to the title screen. */
+export function removeCurrentChild() {
+  const id = useSave.getState().library.current;
+  if (id) useSave.getState().removeChild(id);
+  showTitle();
 }
 
 /** Re-place the dinos and camera after a grown-up resets or corrects things. */

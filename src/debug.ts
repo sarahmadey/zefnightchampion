@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { cam, coach, hero, timeScale } from './game/actors';
 import { useGame, useSave } from './state/store';
 import { addDays, todayKey } from './state/progress';
-import { endPreview, pressDry, pressWet, replayToday, startFromSplash, startPreview, tapCoach, tapHero, resetBoardView } from './game/director';
+import { endPreview, playChild, pressDry, pressWet, replayToday, showTitle, startPreview, tapCoach, tapHero, resetBoardView } from './game/director';
 import { fx } from './board/EventProps';
 import { chestPos } from './board/layout';
 import { pedestalHeight, pedestalPos } from './store/StoreScene';
@@ -25,6 +25,9 @@ export function installDebug() {
     fx,
     game: () => useGame.getState(),
     save: () => useSave.getState().data,
+    lib: () => useSave.getState().library,
+    removeChild: (id: string) => useSave.getState().removeChild(id),
+    cloud: () => useSave.getState().cloud,
     record(dateOffset: number, result: 'dry' | 'wet' | null) {
       useSave.getState().record(addDays(todayKey(), dateOffset), result);
     },
@@ -32,7 +35,11 @@ export function installDebug() {
       for (let i = n - 1; i >= 0; i--) useSave.getState().record(addDays(todayKey(), endOffset - i), 'dry');
     },
     /** Jump the board: n dry nights ending yesterday, all already seen. */
-    seed(n: number, opts: { wetLast?: boolean; setup?: boolean } = {}) {
+    seed(n: number, opts: { wetLast?: boolean; setup?: boolean; name?: string } = {}) {
+      if (!useSave.getState().library.current) {
+        useSave.getState().addChild();
+        useSave.getState().setProfile({ name: opts.name ?? 'Zef' });
+      }
       const s = useSave.getState();
       for (let i = n; i >= 1; i--) s.record(addDays(todayKey(), -i), 'dry');
       if (opts.wetLast) s.record(addDays(todayKey(), -1), 'wet');
@@ -41,7 +48,13 @@ export function installDebug() {
       s.markSeen({ stars: quest.stars, prizes: Math.max(0, quest.stars >= 10 ? 1 + Math.floor((quest.stars - 10) / 15) : 0), meter: opts.wetLast ? 0 : n, hugDate: opts.wetLast ? addDays(todayKey(), -1) : null, underpants: d.underpants.earned });
       if (opts.setup !== false) s.setProfile({ setupDone: true });
     },
-    splash: startFromSplash,
+    /** Start the current (or first) child's morning from the title screen. */
+    splash() {
+      const lib = useSave.getState().library;
+      const id = lib.current ?? Object.keys(lib.children)[0];
+      if (id) playChild(id);
+    },
+    title: showTitle,
     dry: pressDry,
     wet: pressWet,
     replay: replayToday,

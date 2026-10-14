@@ -36,10 +36,14 @@ describe('Coach Rex lines', () => {
 
   it('swaps in name-free lines for another name', () => {
     expect(lineText('greet-1', 'Zef')).toBe('Good morning, Zef!');
-    expect(lineText('greet-1', 'Milo')).toBe('Good morning, big guy!');
+    expect(lineText('greet-1', 'Milo')).toBe('Good morning, superstar!');
     expect(clipId('greet-1', 'zef')).toBe('greet-1');
     expect(clipId('greet-1', 'Milo')).toBe('greet-1--nameless');
     expect(clipId('dry-1', 'Milo')).toBe('dry-1');
+  });
+
+  it("calls only Zef \"big guy\" or a king (any other child might be a girl)", () => {
+    for (const id of Object.keys(LINES)) expect(lineText(id, 'Mia'), id).not.toMatch(/\bbig guy\b|\bking\b/i);
   });
 
   it('only says "twenty nights" when that is the goal', () => {
