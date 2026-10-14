@@ -1140,6 +1140,119 @@ summary {
   outline-offset: 2px;
 }
 
+.title-link {
+  min-height: 40px;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(30, 60, 30, 0.45);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.title-link:focus-visible {
+  outline: 3px solid #ffb703;
+  outline-offset: 2px;
+}
+
+.how-lead {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.how-sub {
+  margin: 6px 0 0;
+  font-size: 18px;
+  color: #2b8a3e;
+}
+
+.how-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.how-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.how-steps p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.how-icon {
+  flex: none;
+  width: 52px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.how-icon .mini {
+  display: block;
+  width: 34px;
+  height: 34px;
+}
+
+.how-icon.pair .mini {
+  width: 26px;
+  height: 26px;
+}
+
+.setup-card.welcome {
+  top: calc(50% + 24px);
+  max-height: calc(100% - 120px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.setup-card.welcome h1 {
+  font-size: 30px;
+}
+
+.how-sheet {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.how-sheet h2 {
+  margin: 0;
+}
+
+.how-sheet:focus {
+  outline: none;
+}
+
+/* buttons that stay in view at the bottom of a scrolling card */
+.sticky-actions {
+  position: sticky;
+  bottom: -22px;
+  margin: 0 -22px -22px;
+  padding: 14px 22px 22px;
+  background: linear-gradient(rgba(255, 255, 250, 0), rgba(255, 255, 250, 0.97) 28%);
+  z-index: 1;
+}
+
+.how-sheet .sticky-actions {
+  background: linear-gradient(transparent, var(--surface) 28%);
+}
+
 .setup-actions {
   display: flex;
   gap: 10px;

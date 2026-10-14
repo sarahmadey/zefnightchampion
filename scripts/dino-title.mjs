@@ -34,14 +34,22 @@ async function setupChild(page, name, species, colorName) {
   await ready(page);
   await page.waitForTimeout(2500);
   await shot(page, '1-first');
+  // the how-it-works sheet for grown-ups
+  await page.getByRole('button', { name: 'For grown-ups: how it works' }).click();
+  await page.waitForTimeout(500);
+  await shot(page, '1b-how');
+  await page.getByRole('button', { name: 'Got it' }).click();
   await page.getByRole('button', { name: 'Start!' }).click({ force: true });
   await page.waitForTimeout(800);
-  await shot(page, '2-name');
+  await shot(page, '2-welcome');
   // back to the title, then really start
   await page.getByRole('button', { name: 'Back' }).click();
   await page.waitForTimeout(800);
   console.log('after back:', JSON.stringify(await page.evaluate(() => ({ phase: window.__dino.game().phase, kids: Object.keys(window.__dino.lib().children).length }))));
   await page.getByRole('button', { name: 'Start!' }).click({ force: true });
+  await page.getByRole('button', { name: /Set it up/ }).click();
+  await page.waitForTimeout(500);
+  await shot(page, '2b-name');
   await setupChild(page, 'Zef', 'T. rex', 'Green');
   await page.evaluate(() => window.__dino.title());
   await page.waitForTimeout(800);

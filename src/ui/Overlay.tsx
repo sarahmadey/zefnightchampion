@@ -19,10 +19,12 @@ import {
   setupNameDone,
   setupPickColor,
   setupPickSpecies,
+  setupWelcomeDone,
   skipIntro,
 } from '../game/director';
 import { DinoBadge } from './DinoBadge';
 import { GoalChips } from './GoalChips';
+import { HOW_LEAD, HowItWorksSheet, HowItWorksSteps } from './HowItWorks';
 import { ParentButton, ParentPanel } from './ParentArea';
 import { ArrowIcon, BigHeartIcon, ChestIcon, ReplayIcon, SoundOffIcon, SoundOnIcon, StarIcon, UnderpantsIcon, BigSunIcon } from './icons';
 import { landRange, landOf } from '../state/progress';
@@ -171,11 +173,19 @@ function TitleButtons() {
   if (!kids.length && cloud === 'connecting' && !waited) {
     return <p className="title-note">Finding your adventures...</p>;
   }
+  const howLink = (
+    <button className="title-link" onClick={() => useGame.getState().set({ howItWorks: true })}>
+      For grown-ups: how it works
+    </button>
+  );
   if (!kids.length) {
     return (
-      <button className="title-btn start" disabled={!ready} onClick={() => addChildFromTitle()}>
-        {ready ? 'Start!' : 'Waking up the dinos...'}
-      </button>
+      <div className="title-buttons">
+        <button className="title-btn start" disabled={!ready} onClick={() => addChildFromTitle()}>
+          {ready ? 'Start!' : 'Waking up the dinos...'}
+        </button>
+        {howLink}
+      </div>
     );
   }
   return (
@@ -200,6 +210,7 @@ function TitleButtons() {
       <button className="title-btn add" disabled={!ready} onClick={() => addChildFromTitle()}>
         + Add new child
       </button>
+      {howLink}
     </div>
   );
 }
@@ -322,18 +333,17 @@ function SetupName() {
       }}
     >
       <h1>A new adventure</h1>
-      <p className="muted">For grown-ups: who is going on this quest?</p>
+      <p className="muted">For grown-ups: who's going on this adventure?</p>
       <label className="name-field">
-        <span>Child's name</span>
+        <span>Your child's name</span>
         <input value={value} placeholder="Name" onChange={(e) => setValue(e.target.value)} maxLength={24} autoComplete="off" />
       </label>
       <div className="name-field">
-        <span>Dry nights in a row to fill the meter</span>
+        <span>How many dry nights in a row fill the underwear meter?</span>
         <GoalChips label="Dry nights in a row to fill the meter" />
       </div>
       <p className="muted small">
-        Each morning your child presses one big button: the smiling sun for a dry night, the heart for a not-dry night. Coach Rex does the rest. You can
-        change the goal any time behind the moon button.
+        Tip: if dry nights are still rare, start small. A goal they can reach feels great, and you can change it any time behind the moon button.
       </p>
       <div className="row setup-actions">
         {canGoBack && (
@@ -388,6 +398,30 @@ function SetupColor() {
   );
 }
 
+/** Before the very first child: what this game is, for grown-ups. */
+function SetupWelcome() {
+  return (
+    <div className="setup-card welcome" role="group" aria-labelledby="welcome-title">
+      <h1 id="welcome-title">Hi, grown-ups!</h1>
+      <p className="how-lead">{HOW_LEAD}</p>
+      <h2 className="how-sub">Here's how it works</h2>
+      <HowItWorksSteps />
+      <p className="muted small">
+        It takes about a minute a day. Next, you'll add your child's name and pick a goal. Then hand over the phone so they can choose their very own
+        dino!
+      </p>
+      <div className="row setup-actions sticky-actions">
+        <button className="btn big" type="button" onClick={() => setupBack()}>
+          Back
+        </button>
+        <button className="btn primary big" type="button" onClick={() => setupWelcomeDone()}>
+          Set it up <ArrowIcon />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function useSetupStep() {
   const step = useGame((s) => s.setupStep);
   const scene = useGame((s) => s.scene);
@@ -395,7 +429,9 @@ function useSetupStep() {
 }
 
 function Setup() {
-  return useSetupStep() === 'name' ? <SetupName /> : null;
+  const step = useSetupStep();
+  if (step === 'welcome') return <SetupWelcome />;
+  return step === 'name' ? <SetupName /> : null;
 }
 
 /** The setup choices that sit along the bottom edge. */
@@ -430,6 +466,7 @@ export function Overlay() {
       </div>
       <PreviewBanner />
       <ParentPanel />
+      <HowItWorksSheet />
     </>
   );
 }

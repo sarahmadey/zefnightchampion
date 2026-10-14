@@ -23,7 +23,9 @@ they've collected. The very first time there's one big **Start!** button.
 After that there's a button for each child ("Zef's adventure!", with a
 picture of their dino so a child who can't read yet can find their own) and
 **+ Add new child**. Each child has their own dino, stars, prizes, meter
-and goal.
+and goal. A small **For grown-ups: how it works** button explains the game
+in plain words, for family members who join an adventure someone else set
+up (the same explanation is in the parent corner).
 
 ## The morning
 
@@ -70,6 +72,10 @@ doesn't add a star and doesn't reset the meter.
 
 ## A new child
 
+0. The very first time, grown-ups get a short welcome first: what the game
+   is for (staying dry at night, so the child can wear underwear to bed
+   instead of diapers) and how a morning, the stars, the hug, the prize
+   chests and the meter work.
 1. A grown-up enters the child's name and picks the goal: how many dry
    nights in a row fill the meter (3, 5, 10, 15 or 20; any other number
    later in the parent corner). Coach Rex says that number in his intro.

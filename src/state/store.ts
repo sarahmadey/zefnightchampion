@@ -241,7 +241,7 @@ export interface Caption {
 }
 
 export type SceneId = 'board' | 'store' | 'setup' | 'title';
-export type SetupStep = 'name' | 'dino' | 'color';
+export type SetupStep = 'welcome' | 'name' | 'dino' | 'color';
 
 interface GameStore {
   phase: Phase;
@@ -249,6 +249,8 @@ interface GameStore {
   setupStep: SetupStep | null;
   /** the setup can go back to the title screen (adding a child, not starting over) */
   setupBack: boolean;
+  /** the "how it works" sheet for grown-ups is open */
+  howItWorks: boolean;
   /** accessories the board shows as unlocked (the egg reveals the newest) */
   shownAccessories: number;
   /** chests the board shows as opened */
@@ -290,6 +292,7 @@ export const useGame = create<GameStore>((set) => ({
   scene: 'board',
   setupStep: null,
   setupBack: false,
+  howItWorks: false,
   shownAccessories: 0,
   openedChests: 0,
   showUnderpants: true,

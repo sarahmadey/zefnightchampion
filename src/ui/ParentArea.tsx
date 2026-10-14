@@ -97,15 +97,20 @@ function ChildrenAndSaving({ name, onLeave }: { name: string; onLeave: () => voi
         Playing now: <strong>{name}</strong>
         {others.length > 0 && <span className="muted"> · also in this game: {others.join(', ')}</span>}
       </p>
-      <button
-        className="btn"
-        onClick={() => {
-          onLeave();
-          showTitle();
-        }}
-      >
-        Switch child or add a child
-      </button>
+      <div className="row">
+        <button
+          className="btn"
+          onClick={() => {
+            onLeave();
+            showTitle();
+          }}
+        >
+          Switch child or add a child
+        </button>
+        <button className="btn ghost" onClick={() => useGame.getState().set({ howItWorks: true })}>
+          How this game works
+        </button>
+      </div>
       <SaveStatus status={cloud} />
     </section>
   );

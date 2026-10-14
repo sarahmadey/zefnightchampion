@@ -1,0 +1,102 @@
+// What this game is for, in plain words, for grown-ups who didn't set it
+// up: shown before the first child is added, and any time from the title
+// screen ("For grown-ups: how it works") and the grown-up corner.
+
+import { useEffect, useRef } from 'react';
+import { useGame } from '../state/store';
+import { BigHeartIcon, BigSunIcon, ChestIcon, StarIcon, UnderpantsIcon } from './icons';
+
+export const HOW_LEAD =
+  'Dino Underwear Quest is a quick morning game for kids who are learning to stay dry at night. It turns every morning into a little celebration, so your child gets excited about wearing underwear to bed instead of diapers.';
+
+export function HowItWorksSteps() {
+  return (
+    <ol className="how-steps">
+      <li>
+        <span className="how-icon pair" aria-hidden>
+          <span className="mini">
+            <BigSunIcon />
+          </span>
+          <span className="mini">
+            <BigHeartIcon />
+          </span>
+        </span>
+        <p>
+          <strong>Every morning</strong>, your child taps one big button: the sun if they woke up dry, or the heart if they didn't.
+        </p>
+      </li>
+      <li>
+        <span className="how-icon" aria-hidden>
+          <StarIcon size={30} />
+        </span>
+        <p>
+          <strong>A dry night</strong> earns a star. Their dino hops ahead on the game board, and a fun surprise pops up.
+        </p>
+      </li>
+      <li>
+        <span className="how-icon" aria-hidden>
+          <span className="mini">
+            <BigHeartIcon />
+          </span>
+        </span>
+        <p>
+          <strong>Not dry?</strong> No big deal. Coach Rex, a friendly T. rex, gives them a big hug, and stars are never taken away.
+        </p>
+      </li>
+      <li>
+        <span className="how-icon" aria-hidden>
+          <ChestIcon size={30} />
+        </span>
+        <p>
+          <strong>Treasure chests</strong> along the way hold real prizes that you hand out, like a movie night or a treat. You choose the prizes.
+        </p>
+      </li>
+      <li>
+        <span className="how-icon" aria-hidden>
+          <UnderpantsIcon size={34} />
+        </span>
+        <p>
+          <strong>The underwear meter</strong> fills up with dry nights in a row. When it's full, your child is ready to wear underwear at night, and picks
+          out a pair for their dino too!
+        </p>
+      </li>
+    </ol>
+  );
+}
+
+/** The same explanation as a sheet over the title screen or the grown-up corner. */
+export function HowItWorksSheet() {
+  const open = useGame((s) => s.howItWorks);
+  const sheet = useRef<HTMLDivElement>(null);
+  // focus the sheet itself (not its button at the bottom), so it opens at the top
+  useEffect(() => {
+    if (open) sheet.current?.focus({ preventScroll: true });
+  }, [open]);
+  if (!open) return null;
+  const close = () => useGame.getState().set({ howItWorks: false });
+  return (
+    <div
+      className="modal-backdrop top"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="how-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) close();
+      }}
+    >
+      <div className="sheet how-sheet" ref={sheet} tabIndex={-1}>
+        <h2 id="how-title">How Dino Underwear Quest works</h2>
+        <p className="how-lead">{HOW_LEAD}</p>
+        <HowItWorksSteps />
+        <p className="muted small">
+          It takes about a minute each morning. To fix a tap, or change the prizes or the goal, press and hold the moon button in the corner.
+        </p>
+        <div className="row end sticky-actions">
+          <button className="btn primary" onClick={close}>
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

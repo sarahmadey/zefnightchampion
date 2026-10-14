@@ -346,26 +346,39 @@ export function playChild(id: string) {
   startMorning(true);
 }
 
-/** "Add new child" (or "Start" the very first time): set up a new adventure. */
+/**
+ * "Add new child" (or "Start" the very first time): set up a new adventure.
+ * The very first time, grown-ups get a short welcome saying what the game is for.
+ */
 export function addChildFromTitle() {
   const g = useGame.getState();
   if (g.phase !== 'title' || !g.ready) return;
   unlockAudio();
   if (data().settings.music) music.start();
   sfx.play('tap');
+  const first = !Object.values(useSave.getState().library.children).some((c) => c.data.profile.name.trim());
   useSave.getState().addChild();
-  beginSetup(true);
+  beginSetup(true, first);
 }
 
-/** Back from the name screen to the title (a child nobody has named yet isn't kept). */
+/** From the grown-ups' welcome to the name screen. */
+export function setupWelcomeDone() {
+  if (useGame.getState().setupStep !== 'welcome') return;
+  sfx.play('tap');
+  useGame.getState().set({ setupStep: 'name' });
+}
+
+/** Back from the welcome or the name screen to the title (a child nobody has named yet isn't kept). */
 export function setupBack() {
   const g = useGame.getState();
-  if (g.setupStep !== 'name' || !g.setupBack) return;
+  if ((g.setupStep !== 'name' && g.setupStep !== 'welcome') || !g.setupBack) return;
   showTitle();
 }
 
-function beginSetup(canGoBack: boolean) {
-  useGame.getState().set({ phase: 'setup', scene: 'setup', setupStep: 'name', setupBack: canGoBack, preview: null, parentOpen: false, fade: 0, highlight: null });
+function beginSetup(canGoBack: boolean, welcome = false) {
+  useGame
+    .getState()
+    .set({ phase: 'setup', scene: 'setup', setupStep: welcome ? 'welcome' : 'name', setupBack: canGoBack, preview: null, parentOpen: false, fade: 0, highlight: null, howItWorks: false });
   setupCamera();
 }
 
