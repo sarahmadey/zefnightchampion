@@ -85,7 +85,7 @@ export function installDebug() {
       const rows: { name: string; tris: number; shadow: boolean }[] = [];
       scene.traverseVisible((o) => {
         const m = o as THREE.Mesh;
-        if (!m.isMesh || !m.geometry) return;
+        if (!m.isMesh || !m.geometry || !m.geometry.getAttribute('position')) return;
         const im = o as THREE.InstancedMesh;
         if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
         const bs = (im.isInstancedMesh ? im.boundingSphere : m.geometry.boundingSphere)?.clone().applyMatrix4(o.matrixWorld);

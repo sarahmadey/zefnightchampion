@@ -9,7 +9,8 @@ import { DEFAULT_RULES, landRange, type QuestRules } from '../state/progress';
 import { BRIDGE, bridgeEnds, groundHeight, landCurve, landDepth, landZ, spacePos } from './layout';
 import { InstancedSet, distToPath, landScatter, swaying } from './decor';
 import { themeFor, type DecorSpec } from './themes';
-import { nestGeometry, stoneGeometry } from './props';
+import { nestGeometry } from './props';
+import { flatStone } from './nature';
 import { ropeGeometry, stickerGeometry } from './prizeIcons';
 import { Chest } from './Chest';
 import { Landmark } from './Landmarks';
@@ -36,6 +37,8 @@ function landGround(land: number, rules: QuestRules): THREE.BufferGeometry {
     g.translate(0, 0, z0 + home / 2);
     const pos = g.getAttribute('position') as THREE.BufferAttribute;
     const colors = new Float32Array(pos.count * 3);
+    // how much of the dirt path and of the cliff edge each point is, for the ground shader
+    const surf = new Float32Array(pos.count * 2);
     const g0 = new THREE.Color(theme.ground[0]);
     const g1 = new THREE.Color(theme.ground[1]);
     const g2 = new THREE.Color(theme.ground[2]);
@@ -56,26 +59,101 @@ function landGround(land: number, rules: QuestRules): THREE.BufferGeometry {
       C2.copy(g2);
       C.lerp(C2, smoothstep(0.62, 0.8, fbm2(x * 0.5, z * 0.5 + land, 2)) * 0.5);
       const pd = distToPath(land, x, z, rules);
-      C.lerp(path, (1 - smoothstep(0.75, 1.15, pd)) * 0.92);
+      const onPath = 1 - smoothstep(0.75, 1.15, pd);
+      C.lerp(path, onPath * 0.92);
       C.lerp(cliff, drop * 0.8);
+      surf[i * 2] = onPath;
+      surf[i * 2 + 1] = drop;
       colors[i * 3] = C.r;
       colors[i * 3 + 1] = C.g;
       colors[i * 3 + 2] = C.b;
     }
     g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    g.setAttribute('aSurf', new THREE.BufferAttribute(surf, 2));
     g.computeVertexNormals();
     return g;
   });
 }
 
-const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+/**
+ * Ground with detail you can see up close: mottled grass with fine blade
+ * streaks, a dirt path scattered with pebbles, and layered cliff edges.
+ */
+const groundMat = (() => {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  m.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec2 aSurf;\nvarying vec2 vSurf;\nvarying vec3 vWPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurf = aSurf;\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec2 vSurf;
+varying vec3 vWPos;
+float gh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float gn(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(gh(i), gh(i + vec2(1, 0)), f.x), mix(gh(i + vec2(0, 1)), gh(i + vec2(1, 1)), f.x), f.y);
+}
+// distance to the nearest pebble centre
+float pebbles(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  float d = 8.0;
+  for (int y = -1; y <= 1; y++)
+  for (int x = -1; x <= 1; x++) {
+    vec2 g = vec2(float(x), float(y));
+    vec2 o = vec2(gh(i + g), gh(i + g + 17.3));
+    vec2 r = g + o - f;
+    d = min(d, dot(r, r));
+  }
+  return sqrt(d);
+}
+vec3 perturbGround(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDir) {
+  vec3 sx = normalize(dFdx(surf_pos)), sy = normalize(dFdy(surf_pos));
+  vec3 r1 = cross(sy, surf_norm), r2 = cross(surf_norm, sx);
+  float det = dot(sx, r1) * faceDir;
+  vec3 grad = sign(det) * (dHdxy.x * r1 + dHdxy.y * r2);
+  return normalize(abs(det) * surf_norm - grad);
+}`,
+      )
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+float groundH;
+{
+  vec2 xz = vWPos.xz;
+  float n1 = gn(xz * 0.9), n2 = gn(xz * 4.3), n3 = gn(xz * vec2(31.0, 23.0)), n4 = gn(xz * vec2(90.0, 23.0));
+  // grass: clumpy patches, short blade streaks and specks
+  float grass = 0.78 + 0.26 * n1 + 0.16 * n2 + 0.16 * (n3 - 0.5) + 0.12 * (n4 - 0.5);
+  // path: dirt with pebbles poking through
+  float pb = vSurf.x > 0.02 ? pebbles(xz * 6.5) : 1.0;
+  float stone = 1.0 - smoothstep(0.16, 0.3, pb);
+  float dirt = 0.86 + 0.16 * n2 + 0.08 * n3;
+  float shade = mix(grass, mix(dirt, 1.08 + 0.1 * n1, stone * 0.85), vSurf.x);
+  // cliffs: rock strata
+  shade *= mix(1.0, 0.82 + 0.18 * sin(vWPos.y * 16.0 + n2 * 4.0), vSurf.y);
+  diffuseColor.rgb *= shade;
+  groundH = mix(n3 * 0.6 + n2 * 0.4, stone * 1.6 + n3 * 0.3, vSurf.x);
+}`,
+      )
+      .replace(
+        '#include <normal_fragment_maps>',
+        `#include <normal_fragment_maps>
+normal = perturbGround(-vViewPosition, normal, vec2(dFdx(groundH), dFdy(groundH)) * 0.6, faceDirection);`,
+      );
+  };
+  m.customProgramCacheKey = () => 'ground-detail';
+  return m;
+})();
 
 const decorMats = new Map<string, THREE.MeshStandardMaterial>();
 function decorMaterial(spec: DecorSpec): THREE.MeshStandardMaterial {
   const key = `${spec.sway ?? 0}:${spec.glow ?? ''}`;
   let m = decorMats.get(key);
   if (!m) {
-    m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 });
+    m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, side: THREE.DoubleSide });
     if (spec.glow) {
       m.emissive = new THREE.Color(spec.glow);
       m.emissiveIntensity = 0.45;
@@ -93,7 +171,7 @@ function Decor({ land, rules }: { land: number; rules: QuestRules }) {
     () =>
       theme.decor.map((spec, i) => ({
         spec,
-        items: landScatter(land, { seed: 300 + i * 37, count: spec.count, scale: spec.scale, clear: spec.clear, maxX: spec.maxX, edge: spec.edge, minSpacing: 0.8 }, rules),
+        items: landScatter(land, { seed: 300 + i * 37, count: spec.count, scale: spec.scale, clear: spec.clear, maxX: spec.maxX, edge: spec.edge, low: spec.low, minSpacing: spec.low ? 0.3 : 0.8 }, rules),
       })),
     [land, rules, theme],
   );
@@ -106,7 +184,8 @@ function Decor({ land, rules }: { land: number; rules: QuestRules }) {
   );
 }
 
-const stoneMat = new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.45, clearcoat: 0.35, clearcoatRoughness: 0.3 });
+const stoneMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 });
+const STONE = new THREE.Color('#d8d0c2');
 const stickerMat = new THREE.MeshPhysicalMaterial({
   color: '#ffcf33',
   roughness: 0.18,
@@ -132,7 +211,7 @@ function Stones({ land, stars, rules }: { land: number; stars: number; rules: Qu
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), k * 1.3);
       m.compose(new THREE.Vector3(p.x, p.y - 0.17, p.z), q, s);
       stones.current.setMatrixAt(k - 1, m);
-      stones.current.setColorAt(k - 1, col.set(theme.stones[k % 3]));
+      stones.current.setColorAt(k - 1, col.set(theme.stones[k % 3]).lerp(STONE, 0.5));
     }
     stones.current.instanceMatrix.needsUpdate = true;
     if (stones.current.instanceColor) stones.current.instanceColor.needsUpdate = true;
@@ -155,7 +234,7 @@ function Stones({ land, stars, rules }: { land: number; stars: number; rules: Qu
   }, [stars, land, n, rules, start]);
   return (
     <group>
-      <instancedMesh ref={stones} args={[stoneGeometry(), stoneMat, n]} receiveShadow raycast={() => null} />
+      <instancedMesh ref={stones} args={[flatStone(), stoneMat, n]} receiveShadow castShadow raycast={() => null} />
       <instancedMesh ref={stickers} args={[stickerGeometry(), stickerMat, n]} raycast={() => null} />
     </group>
   );

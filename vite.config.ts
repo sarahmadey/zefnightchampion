@@ -32,7 +32,8 @@ function voicePack(): Plugin {
         index[f.slice(0, -4)] = [offset, b.length];
         parts.push(b);
         offset += b.length;
-        this.addWatchFile(join(dir, f));
+        // VOICE_WATCH=1 reloads the page when a clip is re-recorded
+        if (process.env.VOICE_WATCH) this.addWatchFile(join(dir, f));
       }
       return `export const index = ${JSON.stringify(index)};\nexport const pack = ${JSON.stringify(Buffer.concat(parts).toString('base64'))};\n`;
     },

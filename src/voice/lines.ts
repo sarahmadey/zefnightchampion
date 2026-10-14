@@ -11,12 +11,12 @@ export interface Line {
 
 export const LINES: Record<string, Line> = {
   // ---------------------------------------------------------- first time
-  'intro-1': { text: "Hey, big guy! I'm Coach Rex! And I heard you're on a super important mission!" },
-  'intro-2': { text: "You're learning to stay dry at night, so you can wear real underpants! That is awesome! And you know what? I know you can do it!" },
-  'intro-3': { text: 'Here is how it works. Every morning, you press the button. Dry night? You get a big shiny star, and we hop forward on our adventure!' },
-  'intro-4': { text: "Not dry? That's okay! You get a big dino hug, and we try again the next night." },
-  'intro-5': { text: 'See that store, way up on the mountain? That is the Underpants Store! Fill up your underpants meter with dry nights in a row, and you get to pick your very own dino underpants!' },
-  'intro-6': { text: "And when you collect enough stars, you open a treasure chest with a prize! Ready? Let's do this! Roooar!" },
+  'intro-1': { text: "Hey, big guy! I'm Coach Rex! I heard you're on a super important mission!" },
+  'intro-2': { text: "You're learning to stay dry at night so you can wear real underpants! That's awesome! And you know what? I know you can do it!" },
+  'intro-3': { text: "Here's how it works. Every morning, you press a button. Dry night? You get a big shiny star, and we hop ahead on our adventure!" },
+  'intro-4': { text: "Not dry? That's okay! You get a big dino hug, and we'll try again!" },
+  'intro-5': { text: "See that store way up on the mountain? That's the Underpants Store! Fill up your underpants meter with dry nights in a row, and you get to pick your very own dino underpants!" },
+  'intro-6': { text: "And when you get enough stars, you get to open a treasure chest with a prize inside! Ready? Let's do this! Roooar!" },
   'pick-dino': { text: 'First, pick your dino! Which one is you?' },
   'picked-trex': { text: 'A T. rex! Rawr! Great choice!' },
   'picked-trike': { text: 'A triceratops! Three horns, triple awesome!' },
@@ -29,7 +29,7 @@ export const LINES: Record<string, Line> = {
   'greet-1': { text: 'Good morning, Zef!', nameless: 'Good morning, big guy!' },
   'greet-2': { text: 'Rise and shine, Zef!', nameless: 'Rise and shine, buddy!' },
   'greet-3': { text: 'Good morning, big guy!' },
-  ask: { text: 'Did you stay dry last night? Press the sun if you stayed dry, or the heart for a big hug!' },
+  ask: { text: 'Did you stay dry last night? Press the sun if you did, or the heart for a big hug!' },
   'ask-short': { text: 'Did you stay dry last night?' },
   already: { text: 'Hey, Zef! You already pressed the button today. See you tomorrow morning!', nameless: 'Hey, buddy! You already pressed the button today. See you tomorrow morning!' },
 
@@ -55,9 +55,9 @@ export const LINES: Record<string, Line> = {
   'acc-bowtie': { text: 'A bow tie! So fancy!' },
   'acc-cowboy': { text: 'A cowboy hat! Yee-haw!' },
   'acc-cape': { text: 'A superhero cape! Super dino!' },
-  'acc-crown': { text: 'A crown! The king of the dinos!' },
+  'acc-crown': { text: "A crown! You're the king of the dinos!" },
   'acc-basketball': { text: 'A basketball! Swish!' },
-  'acc-propeller': { text: 'A propeller hat! Spinny!' },
+  'acc-propeller': { text: 'A propeller hat! Up, up and away!' },
   'acc-medal': { text: 'A gold medal! Number one!' },
   'acc-sneakers': { text: 'Sneakers! Super speedy feet!' },
   'acc-sweatband': { text: 'A sweatband! Ready for the big game!' },
@@ -67,8 +67,8 @@ export const LINES: Record<string, Line> = {
   'acc-tutu': { text: 'A tutu! Twirl, twirl, twirl!' },
   'acc-chef': { text: "A chef hat! What's cooking?" },
   'acc-viking': { text: 'A viking helmet! So brave!' },
-  'acc-trophy': { text: 'A trophy! Champion!' },
-  'acc-wizard': { text: 'A wizard hat! Magic!' },
+  'acc-trophy': { text: "A trophy! You're a champion!" },
+  'acc-wizard': { text: 'A wizard hat! Abracadabra!' },
   'acc-boots': { text: 'Rain boots! Splish, splash!' },
   'acc-goggles': { text: 'Swim goggles! Ready to splash!' },
   highfive: { text: 'Up top! Give me a high five!' },
@@ -82,12 +82,12 @@ export const LINES: Record<string, Line> = {
   // ---------------------------------------------------------- meter
   'meter-up': { text: 'Your underpants meter is filling up!' },
   'meter-half': { text: "You're halfway to the Underpants Store!" },
-  'meter-3': { text: 'Just three more dry nights to the Underpants Store!' },
+  'meter-3': { text: 'Only three more dry nights till the Underpants Store!' },
   'meter-2': { text: 'Just two more dry nights to go!' },
   'meter-1': { text: 'Just one more dry night! You can do it!' },
 
   // ---------------------------------------------------------- chests
-  'chest-reach': { text: 'You made it to the treasure chest! Tap it to open it!' },
+  'chest-reach': { text: "You made it to the treasure chest! Tap it and see what's inside!" },
   'prize-candy': { text: 'You earned... candy! Go tell your grown-up!' },
   'prize-movie': { text: 'You earned... movie night! Go tell your grown-up!' },
   'prize-mcdonalds': { text: "You earned... McDonald's! Go tell your grown-up!" },
@@ -108,24 +108,24 @@ export const LINES: Record<string, Line> = {
 
   // ---------------------------------------------------------- the store
   'store-open': {
-    text: 'Wow! Zef! You did it! All those dry nights in a row! You know what that means? The Underpants Store is open!',
+    text: 'Wow, Zef! You did it! All those dry nights in a row! You know what that means? The Underpants Store is open!',
     nameless: 'Wow! You did it! All those dry nights in a row! You know what that means? The Underpants Store is open!',
   },
   'store-fly': { text: "Hop on! Let's fly!" },
   'store-pick': { text: 'Welcome to the Underpants Store! Pick your favorite dino underpants!' },
   'store-picked': { text: 'Ooh! Those are awesome!' },
-  'store-done': { text: "You're ready for real underpants! Go show your grown-up! I am so proud of you!" },
+  'store-done': { text: "You're ready for real underpants! Go show your grown-up! I'm so proud of you!" },
 
   // ---------------------------------------------------------- not dry
-  'wet-1': { text: "Hey, that's okay, big guy. Your body is still practicing." },
+  'wet-1': { text: "Hey, that's okay, big guy. Your body's still practicing." },
   'wet-2': { text: 'Come here! Big dino hug! My arms are tiny, but my hugs are huge!' },
-  'wet-3': { text: 'And look! You still have all your stars! Tonight is a brand new try!' },
+  'wet-3': { text: "And look! You still have all your stars! Tonight's a brand new try!" },
   'wet-4': { text: "No worries, buddy. Every dino has nights like that. You're still my favorite dino!" },
 
   // ---------------------------------------------------------- goodbye
   'bye-1': { text: 'See you tomorrow morning, big guy!' },
   'bye-2': { text: 'Have an awesome day, Zef! See you tomorrow!', nameless: 'Have an awesome day, buddy! See you tomorrow!' },
-  'bye-3': { text: "Don't forget: go potty before bed! See you in the morning!" },
+  'bye-3': { text: "Don't forget to go potty before bed! See you in the morning!" },
 
   // ---------------------------------------------------------- taps
   'tap-1': { text: 'Hey there!' },

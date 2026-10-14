@@ -1,11 +1,10 @@
 // Sky, fog, clouds and sunlight for the board. Colours ease from one land's
 // mood to the next as Zef crosses a bridge. The sun's shadow follows the dino.
 
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { makeSkyMaterial } from '../three/shaders';
-import { cachedGeo, puffGeometry } from '../three/geometry';
 import { themeFor, type Theme } from './themes';
 import { hero, frameDt } from '../game/actors';
 import { quality } from '../game/quality';
@@ -109,52 +108,74 @@ export function Atmosphere({ theme: themeOverride, land }: { land: number; theme
   );
 }
 
-function cloudGeo(i: number) {
-  return cachedGeo(`bcloud-${i}`, () => {
-    const g = puffGeometry(200 + i * 7, 9, 1.6, 2);
-    const pos = g.getAttribute('position') as THREE.BufferAttribute;
-    const col = new Float32Array(pos.count * 3);
-    const top = new THREE.Color('#ffffff');
-    const under = new THREE.Color('#dfe9ff');
-    const c = new THREE.Color();
-    for (let k = 0; k < pos.count; k++) {
-      c.copy(under).lerp(top, THREE.MathUtils.smoothstep(pos.getY(k), -0.3, 0.45));
-      col[k * 3] = c.r;
-      col[k * 3 + 1] = c.g;
-      col[k * 3 + 2] = c.b;
-    }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    return g;
-  });
+/** A soft, wispy cloud painted from many feathered puffs, with a cooler underside. */
+function cloudTexture(seed: number): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 128;
+  const g = c.getContext('2d')!;
+  const rng = mulberry32(seed);
+  for (let i = 0; i < 70; i++) {
+    const spread = 0.35 + rng() * 0.65;
+    const x = 128 + (rng() - 0.5) * 190 * spread;
+    const lift = 1 - Math.abs(x - 128) / 128;
+    const y = 78 - rng() * 42 * lift;
+    const r = 14 + rng() * 26 * (0.6 + lift * 0.6);
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, 'rgba(255,255,255,0.32)');
+    grad.addColorStop(0.6, 'rgba(255,255,255,0.12)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  // shade the underside where the puffs are
+  g.globalCompositeOperation = 'source-atop';
+  const shade = g.createLinearGradient(0, 30, 0, 100);
+  shade.addColorStop(0, 'rgba(255,255,255,0)');
+  shade.addColorStop(1, 'rgba(176,192,222,0.55)');
+  g.fillStyle = shade;
+  g.fillRect(0, 0, 256, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
-
-const cloudMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0.35, fog: false });
 
 /** Soft clouds that drift by and travel with the camera. */
 function Clouds() {
-  const ref = useRef<THREE.InstancedMesh>(null!);
   const camera = useThree((s) => s.camera);
+  const group = useRef<THREE.Group>(null!);
   const data = useMemo(() => {
     const rng = mulberry32(42);
-    return Array.from({ length: 14 }, () => ({
-      x: randRange(rng, -140, 140),
-      y: randRange(rng, 30, 60),
-      z: randRange(rng, -180, -40),
-      s: randRange(rng, 7, 14),
-      speed: randRange(rng, 0.3, 0.9),
-    }));
+    const textures = [0, 1, 2].map((i) => cloudTexture(300 + i * 17));
+    return Array.from({ length: 14 }, (_, i) => {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: textures[i % 3], transparent: true, depthWrite: false, fog: false, opacity: 0.95 }));
+      sprite.renderOrder = -5;
+      sprite.raycast = () => null;
+      return {
+        sprite,
+        x: randRange(rng, -140, 140),
+        y: randRange(rng, 30, 60),
+        z: randRange(rng, -180, -40),
+        s: randRange(rng, 9, 18),
+        speed: randRange(rng, 0.3, 0.9),
+      };
+    });
   }, []);
-  const m = useMemo(() => new THREE.Matrix4(), []);
-  const q = useMemo(() => new THREE.Quaternion(), []);
+  useEffect(() => {
+    const g = group.current;
+    for (const c of data) g.add(c.sprite);
+    return () => {
+      for (const c of data) g.remove(c.sprite);
+    };
+  }, [data]);
   useFrame((_, raw) => {
     const dt = frameDt(raw) * (motion.reduced ? 0.3 : 1);
-    data.forEach((c, i) => {
+    for (const c of data) {
       c.x += c.speed * dt;
       if (c.x > 160) c.x = -160;
-      m.compose(new THREE.Vector3(c.x, c.y, camera.position.z + c.z), q, new THREE.Vector3(c.s * 1.6, c.s * 0.7, c.s));
-      ref.current.setMatrixAt(i, m);
-    });
-    ref.current.instanceMatrix.needsUpdate = true;
+      c.sprite.position.set(c.x, c.y, camera.position.z + c.z);
+      c.sprite.scale.set(c.s * 3.2, c.s * 1.6, 1);
+    }
   });
-  return <instancedMesh ref={ref} args={[cloudGeo(0), cloudMat, data.length]} frustumCulled={false} raycast={() => null} />;
+  return <group ref={group} />;
 }

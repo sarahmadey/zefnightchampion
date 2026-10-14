@@ -343,7 +343,7 @@ export interface DinoProps {
 
 export function Dino({ actor, species, color, outfit, coach = false, underpants = null, onTap, hit }: DinoProps) {
   const rig = useMemo(() => buildRig(species, color, { coach }), [species, color, coach]);
-  const st = useRef({ t: Math.random() * 10, blinkT: 2 + Math.random() * 2, blink: 1, walkPhase: 0, lookYaw: 0, lookPitch: 0, jaw: 0, stompPhase: -1, animated: [] as THREE.Object3D[] });
+  const st = useRef({ t: Math.random() * 10, blinkT: 2 + Math.random() * 2, blink: 1, walkPhase: 0, lookYaw: 0, lookPitch: 0, jaw: 0, stompPhase: -1, lowerLid: 0.85, animated: [] as THREE.Object3D[] });
   const hitR = hit ?? rig.height * 0.55;
   const hitRef = useRef<THREE.Mesh>(null);
 
@@ -547,7 +547,17 @@ export function Dino({ actor, species, color, outfit, coach = false, underpants 
       seg.rotation.y = p.tailYaw * w * 0.7 + p.tailCurl;
     });
     const eyeSY = p.eyeScale * p.eyeSquash * blink;
+    // sculpted eyes blink and squint with their lids; the old ones squash
+    const openness = clamp(p.eyeSquash * blink, 0, 1);
+    s.lowerLid = damp(s.lowerLid, p.happy ? 0.2 : 0.85, 10, dt);
     for (const e of rig.eyes) {
+      if (e.lid && e.lower) {
+        const wide = -0.75 - clamp(p.eyeScale - 1, 0, 0.5) * 1.2;
+        e.lid.rotation.x = 0.5 + (wide - 0.5) * openness;
+        e.lower.rotation.x = s.lowerLid;
+        e.open.scale.setScalar(Math.min(p.eyeScale, 1.12));
+        continue;
+      }
       e.open.visible = !p.happy;
       e.happy.visible = p.happy;
       e.open.scale.set(p.eyeScale, Math.max(0.06, eyeSY), p.eyeScale);
@@ -561,7 +571,8 @@ export function Dino({ actor, species, color, outfit, coach = false, underpants 
     rig.smile.visible = p.smile && s.jaw < 0.18;
 
     // where the high-five hand is, for tap targets
-    if (rig.arms.length) rig.arms[0].shoulder.localToWorld(handTip.set(0, -0.13, 0.02));
+    if (rig.hand && rig.arms.length) rig.arms[0].shoulder.localToWorld(handTip.copy(rig.hand));
+    else if (rig.arms.length) rig.arms[0].shoulder.localToWorld(handTip.set(0, -0.13, 0.02));
     else rig.legs[0].ankle.localToWorld(handTip.set(0, -0.02, 0.06));
     actor.hand.copy(handTip);
 

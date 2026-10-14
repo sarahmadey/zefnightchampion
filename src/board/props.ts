@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { cachedGeo, curveFrom, extrude, lathe, merge, paint, starShape, tube } from '../three/geometry';
 import { TAU, mulberry32, randRange } from '../three/util';
+import { boulder, bush, cactus, fern, log, palm, pine, wildflower } from './nature';
 
 const C = (hex: string) => new THREE.Color(hex);
 
@@ -17,119 +18,27 @@ function colored(g: THREE.BufferGeometry, color: string | ((p: THREE.Vector3) =>
   return ng;
 }
 
-function leafShape(len: number, width: number): THREE.Shape {
-  const s = new THREE.Shape();
-  s.moveTo(0, 0);
-  s.quadraticCurveTo(width, len * 0.35, 0, len);
-  s.quadraticCurveTo(-width, len * 0.35, 0, 0);
-  return s;
-}
-
-/** A leaf blade that arches outward and droops at the tip. */
-function archedLeaf(len: number, width: number, droop: number, segs = 10): THREE.BufferGeometry {
-  const g = new THREE.ShapeGeometry(leafShape(len, width), segs);
-  const p = g.getAttribute('position') as THREE.BufferAttribute;
-  for (let i = 0; i < p.count; i++) {
-    const y = p.getY(i);
-    const t = y / len;
-    const x = p.getX(i);
-    // curl the sides up a touch and arch the blade
-    p.setZ(i, Math.abs(x) * 0.35 + Math.sin(t * Math.PI * 0.9) * 0.0);
-    p.setY(i, y * Math.cos(t * droop));
-    p.setZ(i, p.getZ(i) - Math.sin(t * droop) * y * 0.9);
-  }
-  g.rotateX(-Math.PI / 2);
-  g.computeVertexNormals();
-  return g;
-}
-
 // ------------------------------------------------------------- jungle
 
 export function palmGeometry(variant = 0): THREE.BufferGeometry {
-  return cachedGeo(`palm-${variant}`, () => {
-    const rng = mulberry32(31 + variant);
-    const h = 3.4 + variant * 0.6;
-    const bend = 0.6 + rng() * 0.4;
-    const trunkCurve = curveFrom([
-      [0, 0, 0],
-      [bend * 0.15, h * 0.35, 0],
-      [bend * 0.5, h * 0.7, 0],
-      [bend, h, 0],
-    ]);
-    const trunk = colored(
-      tube(trunkCurve, { segments: 18, radial: 9, radius: (t) => 0.2 * (1 - t * 0.45) * (1 + 0.12 * Math.max(0, Math.sin(t * 60))) }),
-      (p) => C('#a8743f').lerp(C('#7a4e25'), Math.max(0, Math.sin(p.y * 9)) * 0.6),
-    );
-    const parts = [trunk];
-    const top = trunkCurve.getPoint(1);
-    const fronds = 7;
-    for (let i = 0; i < fronds; i++) {
-      const leaf = archedLeaf(1.9 + rng() * 0.5, 0.42, 1.4 + rng() * 0.4, 8);
-      leaf.rotateY((i / fronds) * TAU + rng() * 0.3);
-      leaf.translate(top.x, top.y, top.z);
-      parts.push(colored(leaf, (p) => C('#3fae49').lerp(C('#8be36b'), Math.min(1, Math.max(0, (p.y - top.y + 0.8) / 1.0)) * 0.6)));
-    }
-    for (let i = 0; i < 3; i++) {
-      const nut = new THREE.SphereGeometry(0.13, 10, 8);
-      nut.translate(top.x + Math.cos(i * 2.1) * 0.15, top.y - 0.15, top.z + Math.sin(i * 2.1) * 0.15);
-      parts.push(colored(nut, '#6b4423'));
-    }
-    return merge(parts);
-  });
+  return palm(variant);
 }
+
 
 export function fernGeometry(): THREE.BufferGeometry {
-  return cachedGeo('fern', () => {
-    const parts: THREE.BufferGeometry[] = [];
-    const n = 9;
-    for (let i = 0; i < n; i++) {
-      const leaf = archedLeaf(1.0 + (i % 3) * 0.15, 0.2, 1.3, 8);
-      leaf.rotateX(-0.25);
-      leaf.rotateY((i / n) * TAU);
-      parts.push(colored(leaf, (p) => C('#2f9e44').lerp(C('#94d82d'), Math.min(1, Math.hypot(p.x, p.z) / 1.0))));
-    }
-    return merge(parts);
-  });
+  return fern(0);
 }
+
 
 export function bushGeometry(seed = 0): THREE.BufferGeometry {
-  return cachedGeo(`bush-${seed}`, () => {
-    const rng = mulberry32(51 + seed);
-    const parts: THREE.BufferGeometry[] = [];
-    for (let i = 0; i < 6; i++) {
-      const r = randRange(rng, 0.35, 0.6);
-      const s = new THREE.IcosahedronGeometry(r, 2);
-      s.translate(randRange(rng, -0.5, 0.5), r * 0.7 + randRange(rng, 0, 0.3), randRange(rng, -0.5, 0.5));
-      parts.push(s);
-    }
-    const g = merge(parts.map((p) => (p.index ? p.toNonIndexed() : p)));
-    return colored(g, (p) => C('#2b8a3e').lerp(C('#69db7c'), Math.min(1, p.y / 1.2)));
-  });
+  return bush(seed);
 }
 
+
 export function flowerGeometry(petal: string, center = '#ffd43b'): THREE.BufferGeometry {
-  return cachedGeo(`flower-${petal}`, () => {
-    const parts: THREE.BufferGeometry[] = [];
-    const stem = tube(curveFrom([[0, 0, 0], [0.03, 0.25, 0], [0, 0.5, 0.02]]), { segments: 6, radial: 5, radius: () => 0.025 });
-    parts.push(colored(stem, '#37b24d'));
-    for (let i = 0; i < 6; i++) {
-      const p = new THREE.SphereGeometry(0.09, 8, 6);
-      p.scale(1, 0.35, 0.6);
-      p.translate(0.1, 0, 0);
-      p.rotateY((i / 6) * TAU);
-      p.translate(0, 0.52, 0.02);
-      parts.push(colored(p, petal));
-    }
-    const c = new THREE.SphereGeometry(0.06, 8, 6);
-    c.translate(0, 0.55, 0.02);
-    parts.push(colored(c, center));
-    const leaf = archedLeaf(0.25, 0.08, 0.6, 4);
-    leaf.rotateY(1);
-    leaf.translate(0, 0.12, 0);
-    parts.push(colored(leaf, '#40c057'));
-    return merge(parts);
-  });
+  return wildflower(petal, center);
 }
+
 
 export function mushroomGeometry(cap = '#ff6b6b'): THREE.BufferGeometry {
   return cachedGeo(`mushroom-${cap}`, () => {
@@ -151,40 +60,21 @@ export function mushroomGeometry(cap = '#ff6b6b'): THREE.BufferGeometry {
 }
 
 export function rockGeometry(seed = 0, color = '#a0a7b8'): THREE.BufferGeometry {
-  return cachedGeo(`rock-${seed}-${color}`, () => {
-    const g = new THREE.DodecahedronGeometry(0.6, 1);
-    const p = g.getAttribute('position') as THREE.BufferAttribute;
-    const rng = mulberry32(71 + seed);
-    for (let i = 0; i < p.count; i++) {
-      const k = 0.85 + rng() * 0.25;
-      p.setXYZ(i, p.getX(i) * k * 1.2, Math.max(-0.05, p.getY(i) * k * 0.7), p.getZ(i) * k);
-    }
-    g.computeVertexNormals();
-    return colored(g, (q) => C(color).lerp(C('#ffffff'), Math.max(0, q.y) * 0.25));
-  });
+  return boulder(seed, color);
 }
 
+
 export function logGeometry(): THREE.BufferGeometry {
-  return cachedGeo('log', () => {
-    const body = new THREE.CylinderGeometry(0.28, 0.3, 2.2, 12);
-    body.rotateZ(Math.PI / 2);
-    body.translate(0, 0.28, 0);
-    const g = colored(body, (p) => (Math.abs(p.x) > 1.08 ? C('#e9c46a') : C('#8d5a2b')));
-    const moss = new THREE.SphereGeometry(0.3, 10, 6);
-    moss.scale(1.6, 0.35, 1);
-    moss.translate(0.2, 0.52, 0);
-    return merge([g, colored(moss, '#69db7c')]);
-  });
+  return log();
 }
+
 
 // ------------------------------------------------------------- volcano
 
 export function emberBushGeometry(): THREE.BufferGeometry {
-  return cachedGeo('ember-bush', () => {
-    const g = bushGeometry(3).clone();
-    return colored(g, (p) => C('#c92a2a').lerp(C('#ffa94d'), Math.min(1, p.y / 1.1)));
-  });
+  return bush(3, '#7a2a12', '#f08c3a');
 }
+
 
 export function steamVentGeometry(): THREE.BufferGeometry {
   return cachedGeo('vent', () => {
@@ -240,26 +130,9 @@ export function beachBallGeometry(): THREE.BufferGeometry {
 // ------------------------------------------------------------- canyon
 
 export function cactusGeometry(seed = 0): THREE.BufferGeometry {
-  return cachedGeo(`cactus-${seed}`, () => {
-    const rng = mulberry32(81 + seed);
-    const h = 1.4 + rng() * 0.8;
-    const parts: THREE.BufferGeometry[] = [];
-    const body = new THREE.CapsuleGeometry(0.22, h, 6, 10);
-    body.translate(0, h / 2 + 0.2, 0);
-    parts.push(body);
-    for (const side of [-1, 1]) {
-      if (rng() < 0.3) continue;
-      const y = h * (0.35 + rng() * 0.3);
-      const arm = tube(curveFrom([[0, y, 0], [side * 0.45, y + 0.05, 0], [side * 0.5, y + 0.55, 0]]), { segments: 10, radial: 8, radius: () => 0.13 });
-      parts.push(arm);
-      const cap = new THREE.SphereGeometry(0.13, 8, 6);
-      cap.translate(side * 0.5, y + 0.55, 0);
-      parts.push(cap);
-    }
-    const g = merge(parts.map((p) => (p.index ? p.toNonIndexed() : p)));
-    return colored(g, (p) => C('#2f9e44').lerp(C('#74b816'), (Math.sin(Math.atan2(p.z, p.x) * 8) + 1) * 0.25));
-  });
+  return cactus(seed);
 }
+
 
 export function bonesGeometry(): THREE.BufferGeometry {
   return cachedGeo('bones', () => {
@@ -323,18 +196,9 @@ export function mesaGeometry(seed = 0): THREE.BufferGeometry {
 // ------------------------------------------------------------- snowy
 
 export function pineGeometry(seed = 0): THREE.BufferGeometry {
-  return cachedGeo(`pine-${seed}`, () => {
-    const parts: THREE.BufferGeometry[] = [];
-    parts.push(colored(new THREE.CylinderGeometry(0.12, 0.16, 0.8, 8).translate(0, 0.4, 0), '#8d5a2b'));
-    for (let i = 0; i < 4; i++) {
-      const r = 1.0 - i * 0.2;
-      const cone = new THREE.ConeGeometry(r, 1.0, 10);
-      cone.translate(0, 1.0 + i * 0.6, 0);
-      parts.push(colored(cone, (p) => (p.y > 1.0 + i * 0.6 + 0.15 ? C('#f8f9fa') : C('#2b8a3e').lerp(C('#40c057'), 0.3))));
-    }
-    return merge(parts);
-  });
+  return pine(seed, true);
 }
+
 
 export function snowballsGeometry(): THREE.BufferGeometry {
   return cachedGeo('snowballs', () => {
@@ -408,15 +272,9 @@ export function crystalGeometry(seed = 0, color = '#b197fc'): THREE.BufferGeomet
 // ------------------------------------------------------------- meadow
 
 export function tulipGeometry(color: string): THREE.BufferGeometry {
-  return cachedGeo(`tulip-${color}`, () => {
-    const stem = colored(tube(curveFrom([[0, 0, 0], [0.02, 0.4, 0], [0, 0.8, 0]]), { segments: 6, radial: 5, radius: () => 0.03 }), '#2f9e44');
-    const head = colored(lathe([[0, 0.72], [0.12, 0.74], [0.16, 0.86], [0.14, 1.0], [0.1, 1.06], [0.0, 1.0]], 10, 8), color);
-    const leaf = archedLeaf(0.45, 0.12, 0.6, 4);
-    leaf.rotateY(2);
-    leaf.translate(0, 0.1, 0);
-    return merge([stem, head, colored(leaf, '#40c057')]);
-  });
+  return wildflower(color, '#ffd43b', 5);
 }
+
 
 export function balloonGeometry(color: string): THREE.BufferGeometry {
   return cachedGeo(`balloon-${color}`, () => {
@@ -430,23 +288,6 @@ export function balloonGeometry(color: string): THREE.BufferGeometry {
 }
 
 // ------------------------------------------------------------- board bits
-
-export function stoneGeometry(): THREE.BufferGeometry {
-  return cachedGeo('stone', () =>
-    lathe(
-      [
-        [0, 0.0],
-        [0.58, 0.0],
-        [0.64, 0.06],
-        [0.62, 0.14],
-        [0.5, 0.19],
-        [0, 0.2],
-      ],
-      28,
-      10,
-    ),
-  );
-}
 
 export function nestGeometry(): THREE.BufferGeometry {
   return cachedGeo('nest', () => {

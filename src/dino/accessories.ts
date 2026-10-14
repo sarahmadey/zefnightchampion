@@ -139,9 +139,12 @@ function propeller() {
   return g;
 }
 
-function sweatband() {
+function sweatband(species: Species) {
   const g = new THREE.Group();
-  g.add(m(G.torus(), pattern({ a: '#ffffff', b: '#ff4d6d', mode: 'helix', freq: 0, twist: 60, roughness: 0.8, clearcoat: 0 }), [0, -0.1, 0.02], [Math.PI / 2 - 0.2, 0, 0], [0.235, 0.235, 0.22]));
+  const band = pattern({ a: '#ffffff', b: '#ff4d6d', mode: 'helix', freq: 0, twist: 60, roughness: 0.8, clearcoat: 0 });
+  // the T. rex's long head needs an oval band round the brow
+  if (species === 'trex') g.add(m(G.torus(), band, [0, -0.005, 0.0], [Math.PI / 2 - 0.22, 0, 0], [0.158, 0.2, 0.2]));
+  else g.add(m(G.torus(), band, [0, -0.1, 0.02], [Math.PI / 2 - 0.2, 0, 0], [0.235, 0.235, 0.22]));
   return g;
 }
 
@@ -295,28 +298,30 @@ function jersey(species: Species) {
           [0.255, -0.17],
           [0.29, -0.05],
           [0.295, 0.06],
-          [0.27, 0.17],
-          [0.22, 0.24],
+          [0.25, 0.16],
+          [0.17, 0.21],
         ],
         32,
         10,
       ),
     );
     g.add(m(body, shirt, [0, 0, 0], [0, 0, 0], [1.02, 1, 1.02]));
-    g.add(m(G.torus(), trim, [0, 0.24, 0], [Math.PI / 2, 0, 0], [0.22, 0.22, 0.08]));
+    g.add(m(G.torus(), trim, [0, 0.205, 0], [Math.PI / 2, 0, 0], [0.165, 0.165, 0.06]));
     const num = cachedGeo('jersey-1', () => roundedBox(0.05, 0.17, 0.02, 0.01, 2));
     g.add(m(num, trim, [0, 0.03, 0.295]));
     g.add(m(cachedGeo('jersey-1b', () => roundedBox(0.06, 0.03, 0.02, 0.01, 2)), trim, [-0.025, 0.1, 0.29], [0, 0, 0.6]));
   } else {
     const blanket = cachedGeo('jersey-quad', () => {
+      // an arc of cloth draped over the back (the arc starts on -x, so turning
+      // the cylinder onto its side the other way puts it on top)
       const c = new THREE.CylinderGeometry(0.36, 0.36, 0.5, 28, 1, true, -Math.PI / 2 - 1.1, 2.2);
-      c.rotateZ(Math.PI / 2);
+      c.rotateZ(-Math.PI / 2);
       c.rotateY(Math.PI / 2);
       return c;
     });
     g.add(m(blanket, shirt, [0, 0.02, 0], [0, 0, 0]));
     for (const s of [-1, 1]) {
-      g.add(m(cachedGeo('jersey-q1', () => roundedBox(0.02, 0.15, 0.045, 0.01, 2)), trim, [0.33 * s, 0.03, 0], [0, 0, s * 0.45]));
+      g.add(m(cachedGeo('jersey-q1', () => roundedBox(0.02, 0.15, 0.045, 0.01, 2)), trim, [0.3 * s, 0.16, 0], [0, 0, -s * 0.85]));
     }
   }
   return g;
@@ -343,8 +348,9 @@ function cape(species: Species) {
   const star = cachedGeo('cape-star', () => extrude(starShape(5, 0.07, 0.032, 0.2), 0.008, 0.003, 4));
   sway.add(m(star, gold(), [0, -0.2, -0.012], [0, Math.PI, 0]));
   if (species === 'trex') {
-    sway.position.set(0, 0.32, -0.22);
-    sway.rotation.x = 0.25;
+    // from the top of the back, lying along it
+    sway.position.set(0, 0.21, -0.2);
+    sway.rotation.x = 0.62;
   } else {
     sway.position.set(0, 0.25, 0.2);
     sway.rotation.x = 1.25;
@@ -398,7 +404,7 @@ function boots() {
 
 function soccerBall() {
   const geo = cachedGeo('soccer', () => {
-    const g = new THREE.IcosahedronGeometry(1, 1).toNonIndexed();
+    const g = new THREE.IcosahedronGeometry(1, 1);
     const pos = g.getAttribute('position') as THREE.BufferAttribute;
     const colors = new Float32Array(pos.count * 3);
     const a = new THREE.Vector3();
@@ -517,7 +523,7 @@ export function buildAccessory(index: number, species: Species): THREE.Group {
       g = sneaker();
       break;
     case 'sweatband':
-      g = sweatband();
+      g = sweatband(species);
       break;
     case 'football':
       g = football();

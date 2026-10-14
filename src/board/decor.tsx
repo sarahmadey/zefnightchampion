@@ -119,6 +119,8 @@ export interface LandScatterOpts {
   edge?: boolean;
   tilt?: number;
   minSpacing?: number;
+  /** low plants (grass, flowers) may grow in the camera's line of sight */
+  low?: boolean;
 }
 
 /** Scatter props over a land, away from the path, the chest and the bridges. */
@@ -142,7 +144,7 @@ export function landScatter(land: number, o: LandScatterOpts, rules: QuestRules 
     // keep the bridge corridors open
     if (Math.abs(x) < 2.2 && (z > z0 + d / 2 - 0.5 || z < z0 - d / 2 + 0.5)) continue;
     // and keep the camera's view of every stone clear (it looks from behind, +z)
-    if (blocksView(land, x, z, rules)) continue;
+    if (!o.low && blocksView(land, x, z, rules)) continue;
     if (o.minSpacing && out.some((p) => Math.hypot(p.pos.x - x, p.pos.z - z) < o.minSpacing!)) continue;
     out.push({
       pos: new THREE.Vector3(x, groundHeight(x, z) - 0.02, z),

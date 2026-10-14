@@ -12,6 +12,8 @@ import { useGame, useSave } from '../state/store';
 import { setupPickSpecies } from '../game/director';
 import { cachedGeo, lathe } from '../three/geometry';
 import { fernGeometry, palmGeometry, bushGeometry } from '../board/props';
+import { grassTuft } from '../board/nature';
+import { mulberry32 } from '../three/util';
 import { Glow } from '../three/bits';
 
 export const SETUP_ORIGIN = new THREE.Vector3(0, 0, -800);
@@ -39,7 +41,29 @@ export const lineup: Record<Species, DinoActor> = Object.fromEntries(
 
 const stageMat = new THREE.MeshPhysicalMaterial({ color: '#8fd16a', roughness: 0.8 });
 const rimMat = new THREE.MeshPhysicalMaterial({ color: '#ffd43b', roughness: 0.4, clearcoat: 0.6 });
-const vc = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 });
+const vc = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, side: THREE.DoubleSide });
+
+/** Grass all round the stage (not in front of it, where the camera is). */
+function StageGrass() {
+  const mesh = useMemo(() => {
+    const rng = mulberry32(12);
+    const n = 420;
+    const m = new THREE.InstancedMesh(grassTuft(0, '#3d8a2c', '#b5e26a', 16, 0.16, 1.4), vc, n);
+    const mat = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI * 0.62 + rng() * Math.PI * 1.24;
+      const r = 4.95 + Math.pow(rng(), 1.5) * 9;
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rng() * Math.PI * 2);
+      const s = 0.8 + rng() * 0.7;
+      mat.compose(new THREE.Vector3(SETUP_ORIGIN.x + Math.sin(a) * r, 0, SETUP_ORIGIN.z - Math.cos(a) * r), q, new THREE.Vector3(s, s, s));
+      m.setMatrixAt(i, mat);
+    }
+    m.raycast = () => null;
+    return m;
+  }, []);
+  return <primitive object={mesh} />;
+}
 
 export function SetupStage() {
   const step = useGame((s) => s.setupStep);
@@ -80,6 +104,7 @@ export function SetupStage() {
           <meshStandardMaterial color="#7cc96b" roughness={1} />
         </mesh>
       </group>
+      <StageGrass />
       {scenery.map((s, i) => (
         <mesh key={i} geometry={s.geo} material={vc} position={s.pos} scale={s.s} rotation={[0, s.r, 0]} />
       ))}

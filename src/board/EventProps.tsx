@@ -5,12 +5,14 @@
 import { useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { cachedGeo, curveFrom, extrude, lathe, merge, paint, starShape, tube } from '../three/geometry';
+import { cachedGeo, curveFrom, extrude, merge, paint, starShape, tube } from '../three/geometry';
 import { burst } from '../three/Particles';
 import { Glow } from '../three/bits';
 import { clamp, damp, ease, mulberry32, TAU } from '../three/util';
 import { frameDt } from '../game/actors';
 import { sfx } from '../audio/sfx';
+import { Ellipsoid, RoundCone, Sculpt, meshSculpt } from '../dino/sdf';
+import { skinMaterial } from '../dino/skin';
 
 export const fx = {
   star: { active: false, t: 0, dur: 1.3, to: new THREE.Vector3(), from: new THREE.Vector3(), started: false, done: null as null | (() => void) },
@@ -142,9 +144,9 @@ function eggHalf(top: boolean) {
       s.scale(1, 1, 0.3);
       s.lookAt(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
       s.translate(Math.cos(a) * r, y, Math.sin(a) * r);
-      spots.push(paint(s.toNonIndexed(), '#6fcf97'));
+      spots.push(paint(s.index ? s.toNonIndexed() : s, '#6fcf97'));
     }
-    return merge([paint(g.toNonIndexed(), '#fff8e7'), ...spots]);
+    return merge([paint(g.index ? g.toNonIndexed() : g, '#fff8e7'), ...spots]);
   });
 }
 
@@ -265,10 +267,31 @@ function HandTarget() {
 
 // -------------------------------------------------------------- pterodactyl
 
-const pteroMat = new THREE.MeshPhysicalMaterial({ color: '#9b6dff', roughness: 0.5, sheen: 0.5, clearcoat: 0.2 });
 const wingMat = new THREE.MeshPhysicalMaterial({ color: '#c8a8ff', roughness: 0.6, side: THREE.DoubleSide, sheen: 0.6 });
-const beakMat = new THREE.MeshPhysicalMaterial({ color: '#ffd43b', roughness: 0.4, clearcoat: 0.5 });
 const pEye = new THREE.MeshBasicMaterial({ color: '#1d1430' });
+const pWhite = new THREE.MeshPhysicalMaterial({ color: '#fbf7ee', roughness: 0.2, clearcoat: 1 });
+const pteroSkin = skinMaterial({ body: '#9b6dff', belly: '#efe4ff', marks: '#6b46c8' }, { marks: 1, seed: 3 });
+
+/** A sculpted pterosaur body: long beak, swept-back crest, little tail and tucked feet. */
+function pteroGeometry(): THREE.BufferGeometry {
+  return cachedGeo('ptero-sculpt', () => {
+    const s = new Sculpt();
+    const r = { bone: 0, belly: 1, dorsal: [0, 1, 0] as [number, number, number], band: [0, 0, 1] as [number, number, number] };
+    const h = { bone: 0, belly: 0, dorsal: [0, 1, 0] as [number, number, number] };
+    s.add(new Ellipsoid([0, 0, -0.02], [0.19, 0.17, 0.4], r));
+    s.add(new Ellipsoid([0, 0.02, 0.2], [0.21, 0.18, 0.2], r), 0.08);
+    s.add(new RoundCone([0, 0.05, 0.3], [0, 0.14, 0.5], 0.11, 0.075, r), 0.06);
+    s.add(new Ellipsoid([0, 0.17, 0.58], [0.095, 0.085, 0.12], h), 0.05);
+    s.add(new RoundCone([0, 0.15, 0.63], [0, 0.1, 1.0], 0.065, 0.012, h), 0.04);
+    s.add(new RoundCone([0, 0.2, 0.55], [0, 0.33, 0.3], 0.05, 0.014, h), 0.04);
+    s.add(new RoundCone([0, -0.01, -0.36], [0, -0.03, -0.6], 0.07, 0.012, r), 0.05);
+    for (const sd of [-1, 1]) {
+      s.add(new RoundCone([0.08 * sd, -0.1, -0.22], [0.08 * sd, -0.2, -0.38], 0.035, 0.022, r), 0.03);
+      s.sub(new Ellipsoid([0.075 * sd, 0.2, 0.63], [0.03, 0.03, 0.03], h), 0.01);
+    }
+    return meshSculpt(s, { cell: 0.012, ao: true });
+  });
+}
 
 function wingGeo() {
   return cachedGeo('ptero-wing', () => {
@@ -290,16 +313,7 @@ function Pterodactyl() {
   const left = useRef<THREE.Group>(null!);
   const right = useRef<THREE.Group>(null!);
   const st = useRef({ t: 0 });
-  const body = useMemo(
-    () =>
-      cachedGeo('ptero-body', () => {
-        const b = lathe([[0, -0.5], [0.22, -0.35], [0.28, 0.0], [0.2, 0.35], [0, 0.5]], 18, 12);
-        b.rotateX(Math.PI / 2);
-        return b;
-      }),
-    [],
-  );
-  const crest = useMemo(() => cachedGeo('ptero-crest', () => tube(curveFrom([[0, 0, 0], [0, 0.1, -0.2], [0, 0.25, -0.45]]), { segments: 8, radial: 6, radius: (t) => 0.08 * (1 - t) + 0.01 })), []);
+  const body = useMemo(() => pteroGeometry(), []);
   useFrame((_, raw) => {
     const p = fx.ptero;
     g.current.visible = p.visible;
@@ -314,21 +328,17 @@ function Pterodactyl() {
   return (
     <group ref={g} visible={false}>
       <group scale={1.4}>
-        <mesh geometry={body} material={pteroMat} castShadow raycast={() => null} />
-        <group position={[0, 0.12, 0.45]}>
-          <mesh material={pteroMat} scale={[0.2, 0.18, 0.24]} raycast={() => null}>
-            <sphereGeometry args={[1, 16, 12]} />
-          </mesh>
-          <mesh material={beakMat} position={[0, -0.02, 0.3]} rotation={[Math.PI / 2, 0, 0]} raycast={() => null}>
-            <coneGeometry args={[0.07, 0.4, 12]} />
-          </mesh>
-          <mesh geometry={crest} material={pteroMat} position={[0, 0.12, -0.05]} raycast={() => null} />
-          {[-1, 1].map((s) => (
-            <mesh key={s} material={pEye} position={[0.13 * s, 0.06, 0.12]} raycast={() => null}>
-              <sphereGeometry args={[0.035, 8, 6]} />
+        <mesh geometry={body} material={pteroSkin} castShadow raycast={() => null} />
+        {[-1, 1].map((s) => (
+          <group key={s} position={[0.075 * s, 0.2, 0.635]}>
+            <mesh material={pWhite} raycast={() => null}>
+              <sphereGeometry args={[0.032, 14, 10]} />
             </mesh>
-          ))}
-        </group>
+            <mesh material={pEye} position={[0.012 * s, 0.002, 0.022]} raycast={() => null}>
+              <sphereGeometry args={[0.016, 10, 8]} />
+            </mesh>
+          </group>
+        ))}
         <group ref={left} position={[0.2, 0.05, 0.05]}>
           <mesh geometry={wingGeo()} material={wingMat} raycast={() => null} />
         </group>

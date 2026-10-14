@@ -6,9 +6,13 @@ smiling sun for a dry night, or the heart for a not-dry night. Coach Rex,
 a big friendly T. rex, does the rest.
 
 Everything you see is built in code with React Three Fiber and Three.js:
-the dinosaurs, the lands, the props and the effects. Coach Rex's voice is
-pre-recorded into small audio clips that ship with the game. The game
-loads nothing from the internet and makes no AI calls while it runs.
+the dinosaurs, the lands, the plants and the effects. The dinosaurs are
+sculpted when the game loads: each is one smooth, skinned body blended from
+soft shapes (a snout and jaw with teeth, muscled legs, clawed toes, a long
+tail, a scaly skin with a banded belly) over the skeleton the animations
+drive. Coach Rex's voice is pre-recorded into small audio clips that ship
+with the game. The game loads nothing from the internet and makes no AI
+calls while it runs.
 
 ## The morning
 
@@ -77,15 +81,21 @@ Progress is saved in this browser's local storage.
 ## Coach Rex's voice
 
 The lines live in `src/voice/lines.ts`. `scripts/voice/generate.py` records
-them with the open-source Kokoro voice model into `src/voice/clips/`, then
-brightens and evens them out with ffmpeg. Re-running it only re-records
-lines that changed. Lines that say "Zef" have name-free twins ("buddy")
-used if the name is changed.
+them into `src/voice/clips/` with the open-source Qwen3-TTS model, using its
+built-in voice "Ryan" directed like a fun kids' TV host, with a mood for
+each kind of line (cheering for dry mornings, gentle for hugs, giggly for
+taps). It shortens long pauses and evens out the loudness with ffmpeg.
+Every clip is checked before it's kept: a speech recognizer (Whisper) must
+hear the right words, and a voice classifier must still hear a man; a clip
+that fails is re-recorded. Re-running only re-records lines that changed.
+Lines that say "Zef" have name-free twins ("buddy") used if the name is
+changed.
 
 To use a different voice, replace the clips with files of the same names.
 
 ```sh
-python scripts/voice/generate.py --models <folder with kokoro-v1.0.onnx and voices-v1.0.bin> --voice am_fenrir --speed 1.2 --pitch 1
+pip install qwen-tts torch faster-whisper librosa soundfile
+python scripts/voice/generate.py --models <folder with Qwen3-TTS-12Hz-1.7B-CustomVoice/, whisper-small.en/ and optionally agegender/>
 ```
 
 ## Developing
@@ -98,6 +108,9 @@ npm run build        # static site in dist/
 npm run build:single # one self-contained HTML file in dist-single/
 ```
 
+`/lab.html` (dev server only) shows one dinosaur under studio lights, e.g.
+`/lab.html?species=trex&color=0&view=34&outfit=0,1&pants=2`.
+
 `?debug` in the URL exposes a small test API on `window.__dino`. With it
 you can seed nights, press the buttons, run previews, and project dinos and
 props to screen positions. The `scripts/dino-*.mjs` files use it with
@@ -109,8 +122,10 @@ parent corner.
 - `src/state`: dates, stars, the meter, prizes, save data, import/export
   (pure and unit tested)
 - `src/game`: the director (every morning event), actors, camera, rewards
-- `src/dino`: jointed dinosaur rigs, the animator, accessories, underpants
-- `src/board`: the lands, path, chests, props, landmarks, sky and lights
+- `src/dino`: the sculpting kit (`sdf.ts`), skin shader, the sculpted T. rex
+  and four-legged dinos, the animator, accessories, underpants
+- `src/board`: the lands, path, chests, plants and rocks (`nature.ts`),
+  landmarks, sky and lights
 - `src/store`: the Underpants Store
 - `src/setup`: the pick-your-dino stage
 - `src/voice`: Coach Rex's lines and the clip player

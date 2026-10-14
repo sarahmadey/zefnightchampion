@@ -59,7 +59,7 @@ export interface DinoActor {
   hand: THREE.Vector3;
 }
 
-function makeActor(x: number, z: number): DinoActor {
+export function makeActor(x: number, z: number): DinoActor {
   return {
     pos: new THREE.Vector3(x, 0, z),
     heading: Math.PI,

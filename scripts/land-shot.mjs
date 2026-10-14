@@ -1,0 +1,24 @@
+// The resting board view at a given number of stars: node scripts/land-shot.mjs 7 phone tag
+import { chromium } from 'playwright';
+const [, , seedArg = '7', sizeArg = 'phone', tag = 'land'] = process.argv;
+const size = sizeArg === 'tablet' ? { width: 1024, height: 768 } : { width: 390, height: 844 };
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await (await browser.newContext({ viewport: size, deviceScaleFactor: 1 })).newPage();
+const logs = [];
+page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
+page.on('console', (m) => { if (m.type() === 'error') logs.push(`[error] ${m.text()}`); });
+await page.goto('http://127.0.0.1:5173/?debug', { waitUntil: 'load' });
+await page.waitForTimeout(2500);
+await page.evaluate((n) => window.__dino.seed(n), Number(seedArg));
+await page.reload({ waitUntil: 'load' });
+await page.waitForTimeout(6000);
+await page.getByRole('button', { name: 'Tap to start' }).click();
+await page.waitForFunction(() => window.__dino && window.__dino.game().phase === 'ask', null, { timeout: 90000 }).catch(async (e) => console.log('wait failed', e.message, logs.join(' | '), JSON.stringify(await page.evaluate(() => { const g = window.__dino?.game(); return g ? { phase: g.phase, scene: g.scene, cut: g.cutscene, awaiting: g.awaiting, cap: g.caption?.text } : 'no api'; }))));
+await page.waitForTimeout(1500);
+await page.addStyleTag({ content: '#root *{visibility:hidden !important} #root canvas{visibility:visible !important}' });
+await page.waitForTimeout(400);
+await page.screenshot({ path: `scripts/out/${tag}-${seedArg}-${sizeArg}.png`, timeout: 120000 });
+const info = await page.evaluate(() => window.__dino.info?.());
+console.log(JSON.stringify(info ?? {}));
+console.log(logs.join('\n'));
+await browser.close();
