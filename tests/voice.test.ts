@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import director from '../src/game/director.ts?raw';
-import { LINES, clipId, lineText } from '../src/voice/lines';
+import { LINES, SPOKEN_GOALS, clipId, lineText } from '../src/voice/lines';
 import { ACCESSORIES } from '../src/game/rewards';
 
 const clips = new Set(Object.keys(import.meta.glob('../src/voice/clips/*.mp3')).map((k) => k.replace(/^.*\/(.*)\.mp3$/, '$1')));
@@ -12,12 +12,20 @@ describe('Coach Rex lines', () => {
       if (!clips.has(id)) missing.push(id);
       if (line.nameless && !clips.has(`${id}--nameless`)) missing.push(`${id}--nameless`);
       if (line.anyGoal && !clips.has(`${id}--anygoal`)) missing.push(`${id}--anygoal`);
+      for (const g of Object.keys(line.goals ?? {})) if (!clips.has(`${id}--goal${g}`)) missing.push(`${id}--goal${g}`);
     }
     expect(missing).toEqual([]);
   });
 
   it('has no clips left over from old lines', () => {
-    const wanted = new Set(Object.entries(LINES).flatMap(([id, l]) => [id, ...(l.nameless ? [`${id}--nameless`] : []), ...(l.anyGoal ? [`${id}--anygoal`] : [])]));
+    const wanted = new Set(
+      Object.entries(LINES).flatMap(([id, l]) => [
+        id,
+        ...(l.nameless ? [`${id}--nameless`] : []),
+        ...(l.anyGoal ? [`${id}--anygoal`] : []),
+        ...Object.keys(l.goals ?? {}).map((g) => `${id}--goal${g}`),
+      ]),
+    );
     expect([...clips].filter((c) => !wanted.has(c))).toEqual([]);
   });
 
@@ -46,12 +54,14 @@ describe('Coach Rex lines', () => {
     for (const id of Object.keys(LINES)) expect(lineText(id, 'Mia'), id).not.toMatch(/\bbig guy\b|\bking\b/i);
   });
 
-  it('only says "twenty nights" when that is the goal', () => {
-    expect(lineText('intro-meter', 'Zef', 20)).toMatch(/twenty nights/);
-    expect(lineText('intro-meter', 'Zef', 14)).not.toMatch(/twenty/);
-    expect(clipId('intro-meter', 'Zef', 20)).toBe('intro-meter');
+  it('says the goal out loud for 3, 5, 10, 15 and 20 nights, and leaves the number out otherwise', () => {
+    const words: Record<number, string> = { 3: 'three', 5: 'five', 10: 'ten', 15: 'fifteen', 20: 'twenty' };
+    for (const g of SPOKEN_GOALS) {
+      expect(lineText('intro-meter', 'Zef', g)).toMatch(new RegExp(`Stay dry ${words[g]} nights`));
+      expect(clipId('intro-meter', 'Mia', g)).toBe(g === 20 ? 'intro-meter' : `intro-meter--goal${g}`);
+    }
+    expect(lineText('intro-meter', 'Zef', 14)).not.toMatch(/nights in a row, and/);
     expect(clipId('intro-meter', 'Zef', 14)).toBe('intro-meter--anygoal');
-    expect(clipId('intro-meter', 'Milo', 14)).toBe('intro-meter--anygoal');
     expect(clipId('store-open', 'Milo', 14)).toBe('store-open--nameless');
   });
 });

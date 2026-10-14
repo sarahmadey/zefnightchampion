@@ -172,6 +172,8 @@ def main():
             jobs.append((f'{lid}--nameless', line['nameless']))
         if line.get('anyGoal'):
             jobs.append((f'{lid}--anygoal', line['anyGoal']))
+        for goal, text in sorted((line.get('goals') or {}).items(), key=lambda kv: int(kv[0])):
+            jobs.append((f'{lid}--goal{goal}', text))
     only = set(x for x in a.only.split(',') if x)
     done, flagged = 0, []
     for lid, text in jobs:

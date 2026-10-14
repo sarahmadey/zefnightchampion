@@ -1,20 +1,29 @@
 // Everything Coach Rex says. Each line is recorded ahead of time into an
 // audio clip (see scripts/voice/generate.py), so the game never synthesises
 // speech while it runs. Lines that say Zef's name (or call him "big guy")
-// have a name-free twin for any other child, and lines that say "twenty
-// nights" have a twin without the number for when a grown-up changes the
-// goal.
+// have a name-free twin for any other child, and the line that says how many
+// nights fill the meter is recorded for each goal a grown-up can pick on the
+// new-child screen (3, 5, 10, 15 or 20 nights), with a twin without the
+// number for any other goal.
 
 export interface Line {
   text: string;
   /** used instead when the child's name isn't Zef */
   nameless?: string;
-  /** used instead when the goal isn't twenty dry nights in a row */
+  /** used instead when the goal is none of the ones said out loud */
   anyGoal?: string;
+  /** versions that say another goal out loud, by number of nights */
+  goals?: Record<number, string>;
 }
 
-/** The goal the lines with a number in them were recorded for. */
+/** The goal `text` says out loud. */
 export const SPOKEN_GOAL = 20;
+
+/** Goals Coach Rex can say out loud (the ones offered on the new-child screen). */
+export const SPOKEN_GOALS = [3, 5, 10, 15, 20];
+
+const meterLine = (nights: string) =>
+  `Now, see this meter? Every dry night in a row fills it up. Stay dry ${nights} nights in a row, and it's all the way full! That means you're ready to wear underwear at night!`;
 
 export const LINES: Record<string, Line> = {
   // ---------------------------------------------------------- first time
@@ -27,7 +36,8 @@ export const LINES: Record<string, Line> = {
   'intro-4': { text: "Not dry? That's okay! You get a big dino hug, and we'll try again!" },
   'intro-prizes': { text: "And along the way, you'll win fun prizes for staying dry! Get enough stars, and you get to open a treasure chest!" },
   'intro-meter': {
-    text: "Now, see this meter? Every dry night in a row fills it up. Stay dry twenty nights in a row, and it's all the way full! That means you're ready to wear underwear at night!",
+    text: meterLine('twenty'),
+    goals: { 3: meterLine('three'), 5: meterLine('five'), 10: meterLine('ten'), 15: meterLine('fifteen') },
     anyGoal: "Now, see this meter? Every dry night in a row fills it up. When it's all the way full, that means you're ready to wear underwear at night!",
   },
   'intro-store': { text: 'And then? We fly to the Underwear Store, way up on that mountain! You get to pick out underwear for your dino, so you can both wear underwear at night!' },
@@ -152,8 +162,9 @@ export const LINES: Record<string, Line> = {
 export type LineId = keyof typeof LINES;
 
 /** Which recording of a line fits this child: the usual one or a twin. */
-function twin(l: Line, name: string, goal: number): 'nameless' | 'anygoal' | null {
+function twin(l: Line, name: string, goal: number): string | null {
   if (l.nameless && !isZef(name)) return 'nameless';
+  if (goal !== SPOKEN_GOAL && l.goals?.[goal]) return `goal${goal}`;
   if (l.anyGoal && goal !== SPOKEN_GOAL) return 'anygoal';
   return null;
 }
@@ -163,7 +174,10 @@ export function lineText(id: string, name: string, goal = SPOKEN_GOAL): string {
   const l = LINES[id];
   if (!l) return '';
   const t = twin(l, name, goal);
-  return t === 'nameless' ? l.nameless! : t === 'anygoal' ? l.anyGoal! : l.text;
+  if (t === 'nameless') return l.nameless!;
+  if (t === 'anygoal') return l.anyGoal!;
+  if (t?.startsWith('goal')) return l.goals![goal];
+  return l.text;
 }
 
 export function isZef(name: string): boolean {

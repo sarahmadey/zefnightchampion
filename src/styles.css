@@ -1108,6 +1108,38 @@ summary {
   font-weight: 700;
 }
 
+.goal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.goal-chip {
+  min-width: 52px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.goal-chip.on {
+  background: #2f9e44;
+  border-color: #2f9e44;
+  color: #fff;
+}
+
+.goal-chip:focus-visible {
+  outline: 3px solid #ffb703;
+  outline-offset: 2px;
+}
+
 .setup-actions {
   display: flex;
   gap: 10px;

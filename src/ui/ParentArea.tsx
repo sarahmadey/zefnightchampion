@@ -28,6 +28,7 @@ import { exportBackup, parseBackup, type SaveData } from '../state/save';
 import { removeCurrentChild, resetBoardView, showTitle, startOver, startPreview } from '../game/director';
 import { childList, type CloudStatus } from '../state/store';
 import { inViewer, retryCloud } from '../state/cloud';
+import { GoalChips } from './GoalChips';
 import { sfx } from '../audio/sfx';
 import { setMusicOn, setSoundOn } from '../audio/core';
 import { music } from '../audio/music';
@@ -529,7 +530,9 @@ export function ParentPanel() {
 
         <section className="card">
           <h2>Underwear goal</h2>
-          <p className="muted small">Dry nights in a row needed to fill the meter and open the Underwear Store. Coach Rex says "twenty nights" when this is 20.</p>
+          <p className="muted small">Dry nights in a row needed to fill the meter and open the Underwear Store.</p>
+          <GoalChips label="Quick picks" />
+          <p className="muted small">Coach Rex says the number out loud in his intro for 3, 5, 10, 15 or 20 nights. For any other number, pick it here:</p>
           <div className="row stepper">
             <button className="btn" aria-label="Fewer nights" disabled={goal <= GOAL_MIN} onClick={() => useSave.getState().setGoal(goal - 1)}>
               −

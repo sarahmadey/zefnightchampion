@@ -22,6 +22,7 @@ import {
   skipIntro,
 } from '../game/director';
 import { DinoBadge } from './DinoBadge';
+import { GoalChips } from './GoalChips';
 import { ParentButton, ParentPanel } from './ParentArea';
 import { ArrowIcon, BigHeartIcon, ChestIcon, ReplayIcon, SoundOffIcon, SoundOnIcon, StarIcon, UnderpantsIcon, BigSunIcon } from './icons';
 import { landRange, landOf } from '../state/progress';
@@ -326,7 +327,14 @@ function SetupName() {
         <span>Child's name</span>
         <input value={value} placeholder="Name" onChange={(e) => setValue(e.target.value)} maxLength={24} autoComplete="off" />
       </label>
-      <p className="muted small">Each morning your child presses one big button: the smiling sun for a dry night, the heart for a not-dry night. Coach Rex does the rest. Grown-up controls are behind the moon button.</p>
+      <div className="name-field">
+        <span>Dry nights in a row to fill the meter</span>
+        <GoalChips label="Dry nights in a row to fill the meter" />
+      </div>
+      <p className="muted small">
+        Each morning your child presses one big button: the smiling sun for a dry night, the heart for a not-dry night. Coach Rex does the rest. You can
+        change the goal any time behind the moon button.
+      </p>
       <div className="row setup-actions">
         {canGoBack && (
           <button className="btn big" type="button" onClick={() => setupBack()}>

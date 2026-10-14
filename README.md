@@ -70,7 +70,9 @@ doesn't add a star and doesn't reset the meter.
 
 ## A new child
 
-1. A grown-up enters the child's name.
+1. A grown-up enters the child's name and picks the goal: how many dry
+   nights in a row fill the meter (3, 5, 10, 15 or 20; any other number
+   later in the parent corner). Coach Rex says that number in his intro.
 2. The child picks their dino (T. rex, triceratops, stegosaurus or
    long-neck) and its color.
 3. Coach Rex explains the mission: stay dry at night so you can wear
@@ -143,8 +145,9 @@ hear the right words, and a voice classifier must still hear a man; a clip
 that fails is re-recorded. Re-running only re-records lines that changed.
 Lines that say "Zef" have name-free twins ("buddy") used if the name is
 changed (or call him "big guy": other children are "superstar" or
-"buddy"), and lines that say "twenty nights" have number-free twins used if
-the goal is changed. Clips for lines that no longer exist are removed.
+"buddy"). The intro line about the meter is recorded for goals of 3, 5, 10,
+15 and 20 nights, the quick picks on the new-child screen, with a twin
+without the number for any other goal. Clips for lines that no longer exist are removed.
 
 To use a different voice, replace the clips with files of the same names.
 
