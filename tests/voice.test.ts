@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import director from '../src/game/director.ts?raw';
-import { LINES, SPOKEN_GOALS, clipId, lineText } from '../src/voice/lines';
+import { LINES, MAX_CHEST_GAP, SPOKEN_GOALS, clipId, lineText } from '../src/voice/lines';
 import { ACCESSORIES } from '../src/game/rewards';
+import { DEFAULT_RULES } from '../src/state/progress';
 
 const clips = new Set(Object.keys(import.meta.glob('../src/voice/clips/*.mp3')).map((k) => k.replace(/^.*\/(.*)\.mp3$/, '$1')));
 
@@ -45,6 +46,9 @@ describe('Coach Rex lines', () => {
     for (let n = 1; n <= 12; n++) for (const id of [`joke-${n}-q`, `joke-${n}-a`, `fact-${n}`]) expect(LINES[id], id).toBeDefined();
     for (const id of ['joke-time-1', 'joke-time-2', 'fact-time-1', 'fact-time-2']) expect(LINES[id], id).toBeDefined();
     for (let n = 1; n <= 10; n++) expect(LINES[`tap-${n}`], `tap-${n}`).toBeDefined();
+    // the longest way to a chest is the gap between later chests
+    expect(MAX_CHEST_GAP).toBeGreaterThanOrEqual(DEFAULT_RULES.prizeEvery);
+    for (let n = 1; n <= MAX_CHEST_GAP; n++) expect(LINES[`chest-more-${n}`], `chest-more-${n}`).toBeDefined();
     for (const id of director.match(/'move-[a-z]+'/g) ?? []) expect(LINES[id.slice(1, -1)], id).toBeDefined();
   });
 

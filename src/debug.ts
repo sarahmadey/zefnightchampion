@@ -7,7 +7,7 @@ import { useGame, useSave } from './state/store';
 import { addDays, computeQuest, prizesEarned, todayKey } from './state/progress';
 import { dayShift, endPreview, playChild, pressDry, pressWet, replayToday, showTitle, startPreview, tapCoach, tapHero, resetBoardView } from './game/director';
 import { fx } from './board/EventProps';
-import { chestPos } from './board/layout';
+import { chestPos, restPos } from './board/layout';
 import { pedestalHeight, pedestalPos } from './store/StoreScene';
 import type { PreviewKind } from './state/store';
 
@@ -90,6 +90,11 @@ export function installDebug() {
     bushScreen(i: number) {
       const b = fx.bushes.items[i];
       return b ? api.project(b.pos.clone().add(new THREE.Vector3(0, 0.55, 0))) : null;
+    },
+    /** How far Zef's dino stands from where its stars say it should (0 = right on its stone). */
+    heroOffBy() {
+      const d = useSave.getState().data;
+      return +hero.pos.distanceTo(restPos(useGame.getState().shownStars, d.rules)).toFixed(2);
     },
     fruitScreen(i: number) {
       const f = fx.fruit.items[i];

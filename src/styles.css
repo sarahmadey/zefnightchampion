@@ -623,26 +623,70 @@ summary {
   gap: 8px;
   align-items: center;
   padding: 6px 14px 6px 10px;
+  border: none;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 4px 16px rgba(40, 80, 30, 0.2);
   backdrop-filter: blur(6px);
+  font-family: var(--font);
   font-size: 26px;
   color: #3b2a12;
-  pointer-events: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.star-counter .star-total,
-.star-counter .chest-left {
+.star-counter:active {
+  transform: translateX(-50%) scale(0.96);
+}
+
+.star-counter .star-total {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
+/* the next treasure chest: how many more stars, and a little bar filling up toward it */
 .star-counter .chest-left {
-  font-size: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
   padding-left: 10px;
   border-left: 2px solid rgba(120, 80, 30, 0.18);
+}
+
+.star-counter .chest-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.star-counter .chest-more {
+  font-size: 15px;
+  font-weight: 700;
+  color: #6b4a1a;
+  white-space: nowrap;
+}
+
+.star-counter .chest-more b {
+  font-size: 21px;
+  color: #3b2a12;
+}
+
+.star-counter .chest-track {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(120, 80, 30, 0.16);
+  overflow: hidden;
+}
+
+.star-counter .chest-track > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ffd43b, #f59f00);
+  transition: width 0.6s ease;
 }
 
 .star-counter.bump .star-total {
@@ -929,6 +973,47 @@ summary {
   height: 36px;
 }
 
+/* the round buttons after the morning, each with a word under it */
+.round-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.round-label {
+  max-width: 84px;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25), 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* until the wardrobe has been opened once, the hanger wiggles now and then */
+.round-btn.dress.call {
+  animation: call 2.4s ease-in-out infinite;
+  box-shadow: 0 6px 0 #7048e8, 0 0 0 5px rgba(255, 255, 255, 0.75), 0 10px 22px rgba(80, 40, 160, 0.35);
+}
+
+@keyframes call {
+  0%, 58%, 100% { transform: rotate(0) scale(1); }
+  64% { transform: rotate(-13deg) scale(1.1); }
+  70% { transform: rotate(11deg) scale(1.1); }
+  76% { transform: rotate(-8deg) scale(1.06); }
+  82% { transform: rotate(5deg) scale(1.03); }
+  88% { transform: rotate(0) scale(1); }
+}
+
+.wardrobe-tip {
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #5c6b50;
+}
+
 .wardrobe {
   width: min(560px, 100%);
   max-height: 46vh;
@@ -1013,7 +1098,7 @@ summary {
   font-family: var(--font);
   font-size: 30px;
   font-weight: 900;
-  cursor: default;
+  cursor: pointer;
   box-shadow: none;
 }
 
@@ -1644,7 +1729,23 @@ summary {
   .title-btn.start,
   .collect-btn,
   .star-counter.glow,
-  .meter.glow {
+  .meter.glow,
+  .round-btn.dress.call {
     animation: none;
   }
+}
+
+.how-hanger {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(180deg, #d0bfff, #9775fa);
+}
+
+.how-hanger svg {
+  width: 22px;
+  height: 22px;
 }

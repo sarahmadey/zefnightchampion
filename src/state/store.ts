@@ -286,6 +286,8 @@ interface GameStore {
   inStore: boolean;
   /** dress-up shelf is open */
   dressUp: boolean;
+  /** the hanger button wiggles: the wardrobe hasn't been opened yet on this device */
+  dressHint: boolean;
   /** waiting for the child to tap something during an event */
   awaiting:
     | null
@@ -333,6 +335,7 @@ export const useGame = create<GameStore>((set) => ({
   shownMeter: 0,
   inStore: false,
   dressUp: false,
+  dressHint: false,
   awaiting: null,
   checkToken: 0,
   set: (patch) => set(patch),

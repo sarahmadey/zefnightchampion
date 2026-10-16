@@ -29,6 +29,21 @@ const meterLine = (nights: string) =>
 const kindMeterLine = (dots: string) =>
   `Now, see this meter? Every dry night adds a dot, and a not-dry night only takes one away. Get ${dots} dots, and it's all the way full! That means you're ready to wear underwear at night!`;
 
+const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen'];
+
+/** The most stars there can be between two treasure chests. */
+export const MAX_CHEST_GAP = 15;
+
+/** "Four more stars to the next treasure chest!", for 1 to 15 stars. */
+function chestMoreLines(): Record<string, Line> {
+  const out: Record<string, Line> = { 'chest-more-1': { text: 'Just one more star to the next treasure chest!' } };
+  for (let n = 2; n <= MAX_CHEST_GAP; n++) {
+    const w = NUMBER_WORDS[n];
+    out[`chest-more-${n}`] = { text: `${w[0].toUpperCase()}${w.slice(1)} more stars to the next treasure chest!` };
+  }
+  return out;
+}
+
 export const LINES: Record<string, Line> = {
   // ---------------------------------------------------------- first time
   'intro-1': {
@@ -169,7 +184,9 @@ export const LINES: Record<string, Line> = {
   band: { text: "Let's make music! Tap the rocks to play a song!" },
   'band-more': { text: 'Ooh, I love it! Keep playing!' },
   'band-done': { text: "What a song! You're a dino rock star!" },
-  wardrobe: { text: 'Dress-up time! What do you want to wear?' },
+  wardrobe: { text: 'Dress-up time! Tap something to put it on!' },
+  'wardrobe-hint': { text: 'Psst! Tap the hanger button to dress up your dino!' },
+  'wardrobe-more': { text: 'More fun stuff is hiding in mystery eggs! Stay dry to find it all!' },
 
   // ---------------------------------------------------------- meter
   'meter-up': { text: 'Look! Your meter is filling up!' },
@@ -180,6 +197,8 @@ export const LINES: Record<string, Line> = {
 
   // ---------------------------------------------------------- chests
   'chest-reach': { text: "You made it to the treasure chest! Tap it and see what's inside!" },
+  // tap the stars at the top: how far to the next chest
+  ...chestMoreLines(),
   'prize-candy': { text: 'You earned... candy! Go tell your grown-up!' },
   'prize-movie': { text: 'You earned... movie night! Go tell your grown-up!' },
   'prize-mcdonalds': { text: "You earned... McDonald's! Go tell your grown-up!" },

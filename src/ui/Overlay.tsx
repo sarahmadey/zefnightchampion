@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { childList, useGame, useQuest, useSave } from '../state/store';
 import {
   addChildFromTitle,
+  askForMoreClothes,
   closeWardrobe,
   collectPrize,
   openWardrobe,
@@ -24,6 +25,7 @@ import {
   setupPickSpecies,
   setupWelcomeDone,
   skipIntro,
+  tapCounter,
   tapMeter,
 } from '../game/director';
 import { DinoBadge } from './DinoBadge';
@@ -61,6 +63,7 @@ function SoundToggle() {
   );
 }
 
+/** Stars so far, and how many more to the next treasure chest (tap it to hear Coach Rex say so). */
 function StarCounter() {
   const shown = useGame((s) => s.shownStars);
   const scene = useGame((s) => s.scene);
@@ -79,19 +82,32 @@ function StarCounter() {
   }, [shown]);
   if (scene !== 'board') return null;
   const land = landOf(shown, rules);
-  const end = landRange(land, rules).end;
+  const { start, end } = landRange(land, rules);
   const left = end - shown;
+  const filled = end > start ? Math.round(((shown - start) / (end - start)) * 100) : 0;
   return (
-    <div className={`star-counter${bump ? ' bump' : ''}${highlight === 'stars' ? ' glow' : ''}`} role="status" aria-label={`${shown} stars. ${left} more to the treasure chest.`}>
+    <button
+      type="button"
+      className={`star-counter${bump ? ' bump' : ''}${highlight === 'stars' ? ' glow' : ''}`}
+      onClick={() => tapCounter()}
+      aria-label={`${shown} ${shown === 1 ? 'star' : 'stars'} so far. ${left} more to the next treasure chest.`}
+    >
       <span className="star-total">
         <StarIcon size={34} />
         <b>{shown}</b>
       </span>
-      <span className="chest-left" title="Stars to the next treasure chest">
-        <ChestIcon size={26} />
-        <b>{left}</b>
+      <span className="chest-left">
+        <span className="chest-row">
+          <ChestIcon size={24} />
+          <span className="chest-more">
+            <b>{left}</b> more
+          </span>
+        </span>
+        <span className="chest-track" aria-hidden>
+          <span style={{ width: `${filled}%` }} />
+        </span>
       </span>
-    </div>
+    </button>
   );
 }
 
@@ -275,15 +291,21 @@ function Done() {
   const phase = useGame((s) => s.phase);
   const cutscene = useGame((s) => s.cutscene);
   const dressUp = useGame((s) => s.dressUp);
+  const hint = useGame((s) => s.dressHint);
   const collected = useGame((s) => s.shownAccessories);
   const quest = useQuest();
   if (phase !== 'done' || cutscene || dressUp) return null;
   return (
     <div className="done">
       {collected > 0 && (
-        <button className="round-btn dress" onClick={() => openWardrobe()} aria-label="Dress up your dino">
-          <HangerIcon />
-        </button>
+        <div className="round-wrap">
+          <button className={`round-btn dress${hint ? ' call' : ''}`} onClick={() => openWardrobe()} aria-label="Dress up your dino">
+            <HangerIcon />
+          </button>
+          <span className="round-label" aria-hidden>
+            Dress up
+          </span>
+        </div>
       )}
       <div className="done-card">
         <span className="done-text">See you tomorrow!</span>
@@ -291,9 +313,14 @@ function Done() {
           {quest.latest?.result === 'wet' ? 'Big hug! Tonight is a new try.' : 'Go potty before bed tonight!'}
         </span>
       </div>
-      <button className="round-btn" onClick={() => replayToday()} aria-label="Watch it again">
-        <ReplayIcon />
-      </button>
+      <div className="round-wrap">
+        <button className="round-btn" onClick={() => replayToday()} aria-label="Watch it again">
+          <ReplayIcon />
+        </button>
+        <span className="round-label" aria-hidden>
+          Watch again
+        </span>
+      </div>
     </div>
   );
 }
@@ -328,6 +355,7 @@ function Wardrobe() {
   if (!open) return null;
   return (
     <div className="wardrobe" role="dialog" aria-label="Dress up">
+      <p className="wardrobe-tip">Tap to put it on. Tap again to take it off.</p>
       <div className="wardrobe-grid">
         {ACCESSORIES.slice(0, collected).map((a, i) => {
           const worn = outfit[a.slot] === i;
@@ -344,9 +372,9 @@ function Wardrobe() {
           );
         })}
         {collected < ACCESSORIES.length && (
-          <span className="wardrobe-item mystery" aria-label="More to find in eggs">
+          <button className="wardrobe-item mystery" onClick={() => askForMoreClothes()} aria-label="More to find in mystery eggs">
             ?
-          </span>
+          </button>
         )}
       </div>
       <button className="wardrobe-done" onClick={() => closeWardrobe()} aria-label="Done dressing up">

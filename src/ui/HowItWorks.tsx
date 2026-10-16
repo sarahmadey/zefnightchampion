@@ -4,7 +4,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useGame, useSave } from '../state/store';
-import { BigHeartIcon, BigSunIcon, ChestIcon, StarIcon, UnderpantsIcon } from './icons';
+import { BigHeartIcon, BigSunIcon, ChestIcon, HangerIcon, StarIcon, UnderpantsIcon } from './icons';
 
 export const HOW_LEAD =
   'Dino Underwear Quest is a quick morning game for kids who are learning to stay dry at night. It turns every morning into a little celebration, so your child gets excited about wearing underwear to bed instead of diapers.';
@@ -50,7 +50,19 @@ export function HowItWorksSteps() {
         </span>
         <p>
           <strong>Treasure chests</strong> along the way hold real prizes that you hand out, like a movie night or a treat. The first one is just 5 dry
-          nights away, and you choose the prizes.
+          nights away, and you choose the prizes. The top of the screen shows the stars so far and how many more until the next chest (tap it to hear
+          Coach Rex say it).
+        </p>
+      </li>
+      <li>
+        <span className="how-icon" aria-hidden>
+          <span className="how-hanger">
+            <HangerIcon />
+          </span>
+        </span>
+        <p>
+          <strong>Dress-up:</strong> every other dry night, a mystery egg hatches something for their dino to wear, like a cap or sunglasses. After the
+          morning, the purple hanger button opens the dress-up closet: tap a picture to put it on, and tap it again to take it off.
         </p>
       </li>
       <li>

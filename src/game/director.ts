@@ -46,7 +46,7 @@ import {
 import { pedestalHeight, pedestalPos, STORE_ORIGIN } from '../store/StoreScene';
 import { lineup } from '../setup/SetupStage';
 import { voice } from '../voice/voice';
-import { lineText } from '../voice/lines';
+import { MAX_CHEST_GAP, lineText } from '../voice/lines';
 import { boardView } from './CameraRig';
 import { clamp, ease, TAU } from '../three/util';
 
@@ -397,7 +397,7 @@ export function showTitle() {
   for (const [id, c] of Object.entries(save.library.children)) {
     if (!c.data.profile.name.trim() && !c.data.profile.setupDone && Object.keys(c.data.records).length === 0) save.removeChild(id);
   }
-  useGame.getState().set({ phase: 'title', scene: 'title', setupStep: null, setupBack: false, preview: null, parentOpen: false, fade: 0, highlight: null, previewUnderpants: null, dressUp: false });
+  useGame.getState().set({ phase: 'title', scene: 'title', setupStep: null, setupBack: false, preview: null, parentOpen: false, fade: 0, highlight: null, previewUnderpants: null, dressUp: false, dressHint: false });
   titleCamera();
 }
 
@@ -471,7 +471,8 @@ function startMorning(fromTitle = false) {
       await ctx.wait(0.5);
       g.set({ fade: 0 });
     }
-    placeAt(g.shownStars);
+    // (read it fresh: syncBoard just set where this child's dino is)
+    placeAt(useGame.getState().shownStars);
     play(hero, 'stretch', 1.8);
     play(coach, 'wave', 1.6);
     closeShot(2);
@@ -496,7 +497,16 @@ function startMorning(fromTitle = false) {
 function finishMorning() {
   boardCamera(1.8);
   placeAt(useGame.getState().shownStars);
-  useGame.getState().set({ phase: data().records[today()] ? 'done' : 'ask', caption: null });
+  const done = !!data().records[today()];
+  // until the wardrobe has been opened once, the hanger wiggles and Coach Rex points it out
+  const hint = done && useGame.getState().shownAccessories > 0 && !dressUpOpened();
+  useGame.getState().set({ phase: done ? 'done' : 'ask', caption: null, dressHint: hint });
+  if (hint) {
+    setTimeout(() => {
+      const g = useGame.getState();
+      if (g.phase === 'done' && g.dressHint && !g.cutscene && !g.dressUp && !g.preview) sayAsync('wardrobe-hint');
+    }, 900);
+  }
 }
 
 /** True when the save holds something the child hasn't seen yet. */
@@ -1479,6 +1489,47 @@ async function dinoBand(ctx: Ctx) {
 
 // ------------------------------------------------------------ wardrobe
 
+const DRESS_KEY = 'zefs-dino-dressup-opened';
+
+/** Has this child opened the wardrobe on this device yet? (Then the hint stops.) */
+function dressUpOpened(): boolean {
+  try {
+    const id = useSave.getState().library.current;
+    return !id || localStorage.getItem(`${DRESS_KEY}:${id}`) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function markDressUpOpened() {
+  try {
+    const id = useSave.getState().library.current;
+    if (id) localStorage.setItem(`${DRESS_KEY}:${id}`, '1');
+  } catch {
+    /* storage blocked: the hint comes back next time, which is harmless */
+  }
+}
+
+/** The "?" in the wardrobe: where more things to wear come from. */
+export function askForMoreClothes() {
+  if (!useGame.getState().dressUp) return;
+  sfx.play('boing');
+  sayAsync('wardrobe-more');
+}
+
+/** Tap the stars at the top: Coach Rex says how many more stars to the next treasure chest, and it sparkles. */
+export function tapCounter() {
+  const g = useGame.getState();
+  if (g.scene !== 'board' || g.cutscene || g.preview || g.dressUp || (g.phase !== 'ask' && g.phase !== 'done') || voice.speaking()) return;
+  unlockAudio();
+  const rules = data().rules;
+  const land = landOf(g.shownStars, rules);
+  const left = clamp(landRange(land, rules).end - g.shownStars, 1, MAX_CHEST_GAP);
+  sfx.play('sparkle');
+  burst('sparkle', chestPos(land, rules).clone().add(new THREE.Vector3(0, 1.3, 0)), { count: 34, speed: 3.2 });
+  sayAsync(`chest-more-${left}`);
+}
+
 /** What Zef's dino is wearing right now. */
 function currentOutfit() {
   return resolveOutfit(useGame.getState().shownAccessories, data().outfit);
@@ -1489,7 +1540,8 @@ export function openWardrobe() {
   const g = useGame.getState();
   if (g.phase !== 'done' || g.cutscene || g.dressUp || g.shownAccessories < 1) return;
   unlockAudio();
-  g.set({ dressUp: true });
+  markDressUpOpened();
+  g.set({ dressUp: true, dressHint: false });
   sfx.play('magic');
   faceCamera(hero);
   const { toCam } = viewAxes();

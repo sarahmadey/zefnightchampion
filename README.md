@@ -59,11 +59,20 @@ up (the same explanation is in the parent corner).
 3. **A joke or a dino fact.** Before saying goodbye, Coach Rex tells a
    silly dino joke one morning (with a pause before the punchline and a
    "ba-dum-tss") and shares a dino fact the next: twelve of each.
-4. **See you tomorrow!** A replay button lets Zef watch it again, and a
-   hanger button opens his dino's wardrobe: everything he's collected,
-   to put on or take off himself, with Coach Rex reacting to each one. What
-   he picks is what his dino wears on the board and the title screen. One
-   press counts per morning, and refreshing never replays or double-counts.
+4. **See you tomorrow!** A "Watch again" button replays the morning, and a
+   purple "Dress up" button opens his dino's wardrobe: everything he's
+   collected, to put on (tap) or take off (tap again) himself, with Coach
+   Rex reacting to each one. What he picks is what his dino wears on the
+   board and the title screen. Until the wardrobe has been opened once on a
+   device, the button wiggles and Coach Rex points it out ("Psst! Tap the
+   hanger button..."); tapping the "?" in the wardrobe explains that more
+   things to wear hide in mystery eggs. One press counts per morning, and
+   refreshing never replays or double-counts.
+
+The top of the screen shows the stars so far and how many more until the
+next treasure chest ("4 more"), with a little bar filling up toward it.
+Tapping it makes Coach Rex say it out loud ("Four more stars to the next
+treasure chest!") while the chest sparkles.
 
 Coach Rex has nine ways to say good morning, a dozen cheers for a dry night
 (and a special one for every tenth star, up to 100), six goodbyes and ten

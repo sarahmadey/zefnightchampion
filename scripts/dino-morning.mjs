@@ -26,6 +26,9 @@ await snap('greet');
 await page.waitForFunction(() => window.__dino.game().phase === 'ask', null, { timeout: 60000 });
 await page.waitForTimeout(800);
 await snap('ask');
+// the dino should stand on its own stone, not back at the nest
+const off = await page.evaluate(() => window.__dino.heroOffBy());
+console.log(off < 0.5 ? `dino on its stone (off by ${off})` : `PROBLEM: dino is ${off} away from its stone`);
 await page.getByRole('button', { name: which === 'dry' ? /Dry! I stayed dry/ : /Not dry/ }).click();
 const start = Date.now();
 let lastAwait = null;
