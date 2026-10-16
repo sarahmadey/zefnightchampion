@@ -1,5 +1,5 @@
 // What each dry morning gives: one surprise from a rotation (an egg with a
-// new accessory, a high five, a silly dance or a roar-off), the prizes the
+// new accessory, or one of ten games with Coach Rex), the prizes the
 // grown-ups set, and the underpants in the store. Everything here is derived
 // from the star count, so replays and refreshes always show the same thing.
 
@@ -38,10 +38,10 @@ export const ACCESSORIES: Accessory[] = [
   { id: 'goggles', name: 'swim goggles', slot: 'face' },
 ];
 
-export type Surprise = 'egg' | 'highfive' | 'dance' | 'roar' | 'balloons' | 'fireworks' | 'peekaboo';
+export type Surprise = 'egg' | 'highfive' | 'dance' | 'roar' | 'balloons' | 'fireworks' | 'peekaboo' | 'tickle' | 'snack' | 'moves' | 'band';
 
 /** Between eggs (and after them all), the other surprises take turns. */
-const AFTER_EGGS: Surprise[] = ['highfive', 'balloons', 'dance', 'peekaboo', 'roar', 'fireworks'];
+const AFTER_EGGS: Surprise[] = ['highfive', 'balloons', 'snack', 'dance', 'peekaboo', 'tickle', 'roar', 'band', 'fireworks', 'moves'];
 
 /** The surprise that star number `star` (1-based) brings. */
 export function surpriseFor(star: number): Surprise {

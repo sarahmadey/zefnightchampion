@@ -1,6 +1,8 @@
 // The newer surprises and the wardrobe: through the grown-up "a surprise"
-// preview, pop the balloons, tap up fireworks and find Coach Rex behind a
-// bush; then open the wardrobe, swap the cap for the party hat and close it.
+// preview (it takes them in turn), tickle Coach Rex, feed him fruit, play the
+// music rocks, do the dino moves, pop the balloons, tap up fireworks and find
+// Coach Rex behind a bush; then open the wardrobe, swap the cap for the party
+// hat and close it.
 import { chromium } from 'playwright';
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 const page = await (await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 })).newPage();
@@ -17,7 +19,53 @@ await page.waitForFunction(() => window.__dino?.game().ready, null, { timeout: 1
 await page.getByRole('button', { name: "Zef's adventure!" }).click();
 await page.waitForFunction(() => window.__dino.game().phase === 'done' && !window.__dino.game().cutscene, null, { timeout: 300000 });
 const waitAwait = (kind) => page.waitForFunction((k) => window.__dino.game().awaiting === k, kind, { timeout: 120000 });
-const idle = () => page.waitForFunction(() => !window.__dino.game().preview, null, { timeout: 180000 });
+const idle = () => page.waitForFunction(() => !window.__dino.game().preview, null, { timeout: 300000 });
+
+// tickle time: tap Coach Rex until he topples over
+await page.evaluate(() => window.__dino.preview('surprise'));
+await waitAwait('tickle');
+await page.waitForTimeout(600);
+for (let i = 0; i < 8; i++) {
+  if ((await page.evaluate(() => window.__dino.game().awaiting)) !== 'tickle') break;
+  const p = await page.evaluate(() => window.__dino.coachScreen());
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(350);
+  if (i === 4) await snap('0a-tickle');
+}
+await idle();
+
+// snack time: every fruit into Coach Rex's mouth
+await page.evaluate(() => window.__dino.preview('surprise'));
+await waitAwait('snack');
+await page.waitForTimeout(600);
+await snap('0b-fruit');
+for (let i = 0; i < 5; i++) {
+  const p = await page.evaluate((i) => window.__dino.fruitScreen(i), i);
+  if (p) await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(850);
+}
+await page.waitForFunction(() => window.__dino.fx.fruit.items.every((f) => f.chewed), null, { timeout: 60000 });
+console.log('fruit eaten: 5');
+await idle();
+
+// the dino band: a little tune on the rocks
+await page.evaluate(() => window.__dino.preview('surprise'));
+await waitAwait('band');
+await page.waitForTimeout(600);
+for (const [k, i] of [0, 1, 2, 3, 4, 3, 2, 4, 0, 2].entries()) {
+  const p = await page.evaluate((i) => window.__dino.rockScreen(i), i);
+  if (p) await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(280);
+  if (k === 3) await snap('0c-band');
+}
+await idle();
+
+// dino moves: nothing to tap, just follow along
+await page.evaluate(() => window.__dino.preview('surprise'));
+await page.waitForFunction(() => (window.__dino.game().caption?.text ?? '').startsWith('Time to move'), null, { timeout: 120000 });
+await page.waitForTimeout(6000);
+await snap('0d-moves');
+await idle();
 
 // balloons
 await page.evaluate(() => window.__dino.preview('surprise'));

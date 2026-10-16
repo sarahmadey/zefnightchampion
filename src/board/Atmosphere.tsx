@@ -10,6 +10,7 @@ import { hero, frameDt } from '../game/actors';
 import { quality } from '../game/quality';
 import { mulberry32, randRange } from '../three/util';
 import { motion } from '../game/settings';
+import { Rainbow, Weather } from './Weather';
 
 export const SUN_DIR = new THREE.Vector3(0.45, 0.75, 0.35).normalize();
 
@@ -104,6 +105,8 @@ export function Atmosphere({ theme: themeOverride, land }: { land: number; theme
         shadow-radius={3}
       />
       <Clouds />
+      <Rainbow />
+      <Weather />
     </>
   );
 }

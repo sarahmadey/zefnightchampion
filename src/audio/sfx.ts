@@ -1,6 +1,6 @@
 // Procedural sound effects made with WebAudio oscillators and noise — no
 // audio files: cartoon dino roars, stomps, high-five slaps, cracking eggs,
-// chests, sparkles and fanfares.
+// chests, sparkles, fanfares, chomps and a burp, and marimba notes.
 
 import { audio, audioIfReady } from './core';
 
@@ -196,7 +196,7 @@ class Synth {
       if (name === 'tap') audio();
       return;
     }
-    if (!this.gate(name + (name === 'chime' || name === 'tick' ? arg : ''), name === 'step' ? 160 : 45)) return;
+    if (!this.gate(name + (name === 'chime' || name === 'tick' || name === 'note' ? arg : ''), name === 'step' ? 160 : 45)) return;
     switch (name) {
       case 'tap':
         this.tone(880, 0.09, { vol: 0.12, glide: 660 });
@@ -304,6 +304,38 @@ class Synth {
       case 'flap':
         for (let i = 0; i < 4; i++) this.noise(0.12, { vol: 0.12, type: 'lowpass', freq: 500, delay: i * 0.22, attack: 0.04 });
         break;
+      case 'toss':
+        this.tone(320, 0.2, { vol: 0.13, type: 'triangle', glide: 900 });
+        break;
+      case 'chomp':
+        // two quick crunchy bites
+        for (let i = 0; i < 2; i++) {
+          this.noise(0.07, { vol: 0.3, type: 'bandpass', freq: 1600 + Math.random() * 600, q: 1.4, attack: 0.003, delay: i * 0.14 });
+          this.tone(150, 0.08, { vol: 0.16, glide: 90, delay: i * 0.14 });
+        }
+        break;
+      case 'burp':
+        // a big, rumbly cartoon burp
+        this.tone(104, 0.55, { vol: 0.3, type: 'sawtooth', glide: 76, filter: 620, vibrato: 27 });
+        this.tone(97, 0.5, { vol: 0.18, type: 'square', glide: 70, filter: 480, vibrato: 31 });
+        this.noise(0.45, { vol: 0.05, type: 'lowpass', freq: 380 });
+        break;
+      case 'note': {
+        // a marimba note on the pentatonic scale (arg 0 = C5)
+        const f = penta(arg);
+        this.tone(f, 0.9, { vol: 0.22, attack: 0.003 });
+        this.tone(f * 2, 0.3, { vol: 0.05, attack: 0.003 });
+        this.tone(f * 4, 0.1, { vol: 0.06, attack: 0.002 });
+        break;
+      }
+      case 'rimshot':
+        // ba-dum-tss
+        this.tone(180, 0.12, { vol: 0.3, glide: 110 });
+        this.noise(0.06, { vol: 0.12, type: 'bandpass', freq: 1800, attack: 0.002 });
+        this.tone(140, 0.14, { vol: 0.32, glide: 85, delay: 0.16 });
+        this.noise(0.07, { vol: 0.12, type: 'bandpass', freq: 1500, attack: 0.002, delay: 0.16 });
+        this.noise(0.6, { vol: 0.12, type: 'highpass', freq: 6000, attack: 0.004, delay: 0.38 });
+        break;
     }
   }
 }
@@ -337,6 +369,11 @@ export type SoundName =
   | 'balloon'
   | 'firework'
   | 'rustle'
-  | 'poof';
+  | 'poof'
+  | 'toss'
+  | 'chomp'
+  | 'burp'
+  | 'note'
+  | 'rimshot';
 
 export const sfx = new Synth();

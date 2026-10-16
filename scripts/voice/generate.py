@@ -48,6 +48,15 @@ MOODS = [
     (r'^(ask|ask-short|already)$', 'Curious and warm, asking a little kid a question.'),
     (r'^intro-(3|4|prizes|meter|meter-kind)$', 'Clear and upbeat, explaining a fun game to a little kid.'),
     (r'^peekaboo', 'Playful and giggly, playing hide and seek with a little kid.'),
+    (r'^joke-time', 'Playful and a little mischievous, about to tell a silly joke.'),
+    (r'^joke-.*-q$', 'Playful and mischievous, asking a silly riddle with a curious lilt.'),
+    (r'^joke-.*-a$', 'Delivering the punchline of a silly joke with big comic energy, grinning.'),
+    (r'^fact', 'Amazed and curious, sharing a cool dinosaur fact with a little kid, like a fun museum guide.'),
+    (r'^tickle', 'Giggly and ticklish, laughing while talking.'),
+    (r'^snack', 'Hungry and silly, then delighted.'),
+    (r'^(moves|move-)', 'Energetic and rhythmic, like a fun gym coach for little kids.'),
+    (r'^band', 'Cheerful and musical, grooving to the music.'),
+    (r'^stars-', 'Bursting with joy and celebrating a huge milestone, big and bouncy.'),
     (r'^(balloons|fireworks)', 'Bursting with joy and celebrating, big and bouncy.'),
     (r'^(intro|greet|pick|picked|color)', 'Excited and warm, like telling a kid great news.'),
     (r'^(dry|first-star|hop|highfive|roar|dance|store)', 'Bursting with joy and celebrating, big and bouncy.'),
@@ -87,8 +96,23 @@ def tighten(y, sr):
     return np.concatenate([pad, *parts, pad])
 
 
+ONES = 'zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen'.split()
+TENS = 'twenty thirty forty fifty sixty seventy eighty ninety'.split()
+
+
+def number_words(n):
+    """How a number is said, so a recognizer writing "40" still matches "forty"."""
+    if n < 20:
+        return ONES[n]
+    if n < 100:
+        return TENS[n // 10 - 2] + ('' if n % 10 == 0 else ' ' + ONES[n % 10])
+    if n == 100:
+        return 'one hundred'
+    return str(n)
+
+
 def words(t):
-    t = t.lower()
+    t = re.sub(r'\d+', lambda m: number_words(int(m.group())), t.lower())
     for a, b in [('woo-hoo', 'woohoo'), ('woo hoo', 'woohoo'), ('t. rex', 't rex'), ('t-rex', 't rex'), ("mcdonald's", 'mcdonalds'),
                  ('yee-haw', 'yeehaw'), ('ha ha', 'haha'), ('ha-ha', 'haha'), ('rooo', 'ro'), ('rawr', 'roar'), ('wheee', 'whee')]:
         t = t.replace(a, b)

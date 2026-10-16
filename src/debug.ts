@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { cam, coach, hero, timeScale } from './game/actors';
 import { useGame, useSave } from './state/store';
 import { addDays, computeQuest, prizesEarned, todayKey } from './state/progress';
-import { endPreview, playChild, pressDry, pressWet, replayToday, showTitle, startPreview, tapCoach, tapHero, resetBoardView } from './game/director';
+import { dayShift, endPreview, playChild, pressDry, pressWet, replayToday, showTitle, startPreview, tapCoach, tapHero, resetBoardView } from './game/director';
 import { fx } from './board/EventProps';
 import { chestPos } from './board/layout';
 import { pedestalHeight, pedestalPos } from './store/StoreScene';
@@ -18,6 +18,7 @@ export function installDebug() {
   if (speed > 0) timeScale.value = speed;
   // software-rendered test browsers run at a few fps: let game time keep up
   timeScale.maxDt = Number(q.get('maxdt') ?? '0.25');
+  dayShift.days = Number(q.get('dayshift') ?? '0') || 0;
   const api = {
     hero,
     coach,
@@ -89,6 +90,14 @@ export function installDebug() {
     bushScreen(i: number) {
       const b = fx.bushes.items[i];
       return b ? api.project(b.pos.clone().add(new THREE.Vector3(0, 0.55, 0))) : null;
+    },
+    fruitScreen(i: number) {
+      const f = fx.fruit.items[i];
+      return f && !f.flying ? api.project(f.pos.clone().add(new THREE.Vector3(0, 0.2, 0))) : null;
+    },
+    rockScreen(i: number) {
+      const r = fx.rocks.items[i];
+      return r ? api.project(r.pos.clone().add(new THREE.Vector3(0, 0.2, 0))) : null;
     },
     introStarScreen() {
       return api.project(fx.introStar.pos.clone());

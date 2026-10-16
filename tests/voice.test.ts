@@ -40,6 +40,12 @@ describe('Coach Rex lines', () => {
     for (const a of ACCESSORIES) expect(LINES[`acc-${a.id}`], a.id).toBeDefined();
     for (let i = 0; i < 7; i++) expect(LINES[`land-${i}`]).toBeDefined();
     for (const n of [1, 2, 3]) expect(LINES[`meter-${n}`]).toBeDefined();
+    // lines picked by number: milestone cheers, jokes and dino facts, Coach Rex's taps, the dino moves
+    for (let n = 10; n <= 100; n += 10) expect(LINES[`stars-${n}`], `stars-${n}`).toBeDefined();
+    for (let n = 1; n <= 12; n++) for (const id of [`joke-${n}-q`, `joke-${n}-a`, `fact-${n}`]) expect(LINES[id], id).toBeDefined();
+    for (const id of ['joke-time-1', 'joke-time-2', 'fact-time-1', 'fact-time-2']) expect(LINES[id], id).toBeDefined();
+    for (let n = 1; n <= 10; n++) expect(LINES[`tap-${n}`], `tap-${n}`).toBeDefined();
+    for (const id of director.match(/'move-[a-z]+'/g) ?? []) expect(LINES[id.slice(1, -1)], id).toBeDefined();
   });
 
   it('swaps in name-free lines for another name', () => {

@@ -1,13 +1,14 @@
 // Things that appear during a morning event: the big star that flies to the
 // board, the mystery egg that cracks open and the prize that floats out of it,
 // the glowing high-five target, balloons to pop, fireworks tapped into the
-// sky, bushes for hide-and-seek, and the friendly pterodactyl that flies Zef
-// to the Underwear Store.
+// sky, bushes for hide-and-seek, fruit for Coach Rex's snack, the dino band's
+// music rocks, and the friendly pterodactyl that flies Zef to the Underwear
+// Store.
 
 import { useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { cachedGeo, curveFrom, extrude, merge, paint, starShape, tube } from '../three/geometry';
+import { cachedGeo, curveFrom, extrude, lathe, lumpy, merge, paint, petalShape, sphere, starShape, tube } from '../three/geometry';
 import { burst } from '../three/Particles';
 import { Glow } from '../three/bits';
 import { clamp, damp, ease, mulberry32, TAU } from '../three/util';
@@ -33,6 +34,16 @@ export const fx = {
   introStar: { visible: false, pos: new THREE.Vector3() },
   /** hide-and-seek bushes */
   bushes: { active: false, items: [] as { pos: THREE.Vector3; wiggle: number; scale: number; heading: number }[] },
+  /** Coach Rex's snack: fruit on a big leaf; a tapped one flies into his mouth */
+  fruit: {
+    active: false,
+    pop: 0,
+    heading: 0,
+    leaf: new THREE.Vector3(),
+    items: [] as { pos: THREE.Vector3; from: THREE.Vector3; to: THREE.Vector3; fly: number; flying: boolean; landed: boolean; chewed: boolean }[],
+  },
+  /** the dino band's music rocks: each one plays a note when tapped */
+  rocks: { active: false, pop: 0, items: [] as { pos: THREE.Vector3; bounce: number; glow: number; hint: number }[] },
   hand: { visible: false, pos: new THREE.Vector3(), follow: null as null | { hand: THREE.Vector3 } },
   ptero: { visible: false, pos: new THREE.Vector3(), heading: 0, flap: 1, carry: false },
 };
@@ -44,6 +55,14 @@ let balloonTap: ((i: number) => void) | null = null;
 let skyTap: ((p: THREE.Vector3) => void) | null = null;
 let bushTap: ((i: number) => void) | null = null;
 let introStarTap: (() => void) | null = null;
+let fruitTap: ((i: number) => void) | null = null;
+let rockTap: ((i: number) => void) | null = null;
+export function onFruitTap(fn: ((i: number) => void) | null) {
+  fruitTap = fn;
+}
+export function onRockTap(fn: ((i: number) => void) | null) {
+  rockTap = fn;
+}
 export function onIntroStarTap(fn: (() => void) | null) {
   introStarTap = fn;
 }
@@ -560,6 +579,274 @@ function Bushes() {
   );
 }
 
+// -------------------------------------------------------------- snack time
+
+/** The fruit on Coach Rex's leaf plate, and the colours of their crumbs. */
+export const FRUIT = [
+  { id: 'watermelon', crumbs: ['#ff5c6c', '#2b8a3e', '#ffd1d6'] },
+  { id: 'apple', crumbs: ['#e03131', '#fff3bf'] },
+  { id: 'banana', crumbs: ['#ffd43b', '#fff3bf'] },
+  { id: 'orange', crumbs: ['#ff922b', '#ffc078'] },
+  { id: 'grapes', crumbs: ['#845ef7', '#d0bfff'] },
+];
+export const FRUIT_SIZE = 1.35;
+
+const fruitMat = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.3 });
+const leafMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide });
+
+function smallLeaf(len: number, tilt: number, at: [number, number, number]) {
+  const g = extrude(petalShape(len, len * 0.5), 0.008, 0.004, 6);
+  g.rotateZ(tilt);
+  g.translate(...at);
+  return paint(g, '#51cf66');
+}
+
+function fruitGeometry(kind: number): THREE.BufferGeometry {
+  return cachedGeo(`fruit-${kind}`, () => {
+    if (kind === 0) {
+      // a watermelon slice standing on its rind
+      const r = 0.3;
+      const shape = new THREE.Shape();
+      shape.moveTo(0, 0);
+      shape.absarc(0, 0, r, -Math.PI / 2 - 0.62, -Math.PI / 2 + 0.62, false);
+      shape.lineTo(0, 0);
+      const slice = paint(extrude(shape, 0.08, 0.015, 20), (q) => {
+        const d = Math.hypot(q.x, q.y);
+        return new THREE.Color(d > r - 0.025 ? '#2b8a3e' : d > r - 0.06 ? '#e9fac8' : '#ff5c6c');
+      });
+      const seeds = [
+        [-0.05, -0.12],
+        [0.05, -0.12],
+        [0, -0.18],
+        [-0.09, -0.19],
+        [0.09, -0.19],
+      ].flatMap(([x, y]) =>
+        [1, -1].map((side) => {
+          const seed = new THREE.SphereGeometry(0.013, 6, 4);
+          seed.scale(1, 1.6, 0.5);
+          seed.translate(x, y, side * 0.056);
+          return paint(seed, '#212529');
+        }),
+      );
+      const g = merge([slice, ...seeds]);
+      g.translate(0, r + 0.01, 0);
+      return g;
+    }
+    if (kind === 1) {
+      // an apple with a stem and a leaf
+      const body = paint(
+        lathe(
+          [
+            [0, 0.015],
+            [0.09, 0],
+            [0.15, 0.05],
+            [0.165, 0.13],
+            [0.15, 0.21],
+            [0.1, 0.26],
+            [0.035, 0.245],
+            [0, 0.225],
+          ],
+          20,
+          20,
+        ),
+        (q) => new THREE.Color('#c92a2a').lerp(new THREE.Color('#ff6b6b'), Math.min(1, Math.max(0, q.y / 0.26)) * 0.6),
+      );
+      const stem = new THREE.CylinderGeometry(0.01, 0.014, 0.09, 6);
+      stem.rotateZ(0.2);
+      stem.translate(0, 0.27, 0);
+      return merge([body, paint(stem, '#7c4a22'), smallLeaf(0.12, -1.0, [0.01, 0.28, 0])]);
+    }
+    if (kind === 2) {
+      // a banana, curved like a smile
+      const g = tube(
+        curveFrom([
+          [-0.22, 0.13, 0],
+          [-0.11, 0.05, 0],
+          [0, 0.035, 0],
+          [0.11, 0.05, 0],
+          [0.22, 0.13, 0],
+        ]),
+        { segments: 24, radial: 10, radius: (t) => 0.012 + 0.055 * Math.pow(Math.sin(Math.PI * t), 0.6) },
+      );
+      g.translate(0, 0.035, 0);
+      return paint(g, (q) => new THREE.Color(Math.abs(q.x) > 0.19 ? '#5c3d1e' : '#ffd43b'));
+    }
+    if (kind === 3) {
+      // an orange with a dimpled peel
+      const body = lumpy(sphere(0.15, 20, 14), 0.006, 22, 4);
+      body.translate(0, 0.15, 0);
+      const nub = sphere(0.016, 6, 4);
+      nub.translate(0, 0.298, 0);
+      return merge([paint(body, '#ff922b'), paint(nub, '#5c940d'), smallLeaf(0.1, -1.1, [0, 0.29, 0])]);
+    }
+    // a little pile of grapes with a stem
+    const spots: [number, number, number][] = [
+      [-0.1, 0.05, 0.04],
+      [0, 0.05, 0.06],
+      [0.1, 0.05, 0.04],
+      [-0.05, 0.05, -0.05],
+      [0.05, 0.05, -0.05],
+      [-0.05, 0.13, 0.02],
+      [0.05, 0.13, 0.02],
+      [0, 0.13, -0.06],
+      [0, 0.2, 0],
+    ];
+    const shades = ['#845ef7', '#7048e8', '#9775fa'];
+    const balls = spots.map(([x, y, z], i) => {
+      const b = sphere(0.055, 12, 8);
+      b.translate(x, y, z);
+      return paint(b, shades[i % 3]);
+    });
+    const stem = tube(
+      curveFrom([
+        [0, 0.24, 0],
+        [0.02, 0.3, 0],
+        [0.06, 0.33, 0],
+      ]),
+      { segments: 6, radial: 5, radius: () => 0.012 },
+    );
+    return merge([...balls, paint(stem, '#5c3d1e')]);
+  });
+}
+
+/** The big leaf the fruit sits on, lying flat, long side across the view. */
+function leafPlateGeometry() {
+  return cachedGeo('leaf-plate', () => {
+    const g = extrude(petalShape(2.9, 0.75), 0.03, 0.01, 16);
+    g.translate(0, -1.45, 0);
+    g.rotateZ(Math.PI / 2);
+    g.rotateX(-Math.PI / 2);
+    return paint(g, (q) => new THREE.Color(Math.abs(q.z) < 0.03 ? '#94d82d' : '#40c057'));
+  });
+}
+
+function SnackFruit() {
+  const groups = useRef<(THREE.Group | null)[]>([]);
+  const leaf = useRef<THREE.Mesh>(null);
+  const st = useRef({ t: 0 });
+  useFrame((_, raw) => {
+    const dt = frameDt(raw);
+    st.current.t += dt;
+    const f = fx.fruit;
+    if (leaf.current) {
+      leaf.current.visible = f.active && f.pop > 0.01;
+      leaf.current.position.copy(f.leaf);
+      leaf.current.rotation.y = f.heading;
+      leaf.current.scale.setScalar(Math.max(0.001, f.pop));
+    }
+    for (let i = 0; i < FRUIT.length; i++) {
+      const g = groups.current[i];
+      if (!g) continue;
+      const it = f.items[i];
+      const show = f.active && !!it && !it.landed && f.pop > 0.01;
+      g.visible = show;
+      if (!show) continue;
+      if (it.flying) {
+        // an arc up and into Coach Rex's mouth, spinning and shrinking as it goes
+        it.fly = Math.min(1, it.fly + dt / 0.6);
+        const u = it.fly;
+        g.position.lerpVectors(it.from, it.to, u);
+        g.position.y += Math.sin(u * Math.PI) * 0.9;
+        g.rotation.x += dt * 9;
+        g.scale.setScalar(FRUIT_SIZE * (1 - 0.55 * u));
+        if (u >= 1) it.landed = true;
+      } else {
+        g.position.copy(it.pos);
+        g.position.y += Math.abs(Math.sin(st.current.t * 2.4 + i * 1.3)) * 0.03;
+        g.rotation.set(0, f.heading + Math.sin(st.current.t * 1.4 + i) * 0.2, 0);
+        g.scale.setScalar(FRUIT_SIZE * Math.max(0.001, f.pop));
+      }
+    }
+  });
+  return (
+    <>
+      <mesh ref={leaf} geometry={leafPlateGeometry()} material={leafMat} visible={false} receiveShadow raycast={() => null} />
+      {FRUIT.map((_, i) => (
+        <group key={i} ref={(el) => (groups.current[i] = el)} visible={false}>
+          <mesh geometry={fruitGeometry(i)} material={fruitMat} castShadow raycast={() => null} />
+          <mesh
+            visible={false}
+            position={[0, 0.15, 0]}
+            onPointerDown={(ev) => {
+              if (!fruitTap) return;
+              ev.stopPropagation();
+              fruitTap(i);
+            }}
+          >
+            <sphereGeometry args={[0.3, 10, 8]} />
+          </mesh>
+        </group>
+      ))}
+    </>
+  );
+}
+
+// -------------------------------------------------------------- dino band
+
+/** The music rocks, low note to high, in rainbow order. */
+export const ROCK_COLORS = ['#ff6b6b', '#ffa94d', '#ffd43b', '#69db7c', '#4dabf7'];
+const rockMats = ROCK_COLORS.map(
+  (c) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.1, emissive: new THREE.Color(c), emissiveIntensity: 0.1, flatShading: true }),
+);
+
+function musicRockGeometry() {
+  return cachedGeo('music-rock', () => {
+    const g = new THREE.IcosahedronGeometry(0.3, 1);
+    g.scale(1, 0.78, 1);
+    g.translate(0, 0.22, 0);
+    g.computeVertexNormals();
+    return g;
+  });
+}
+
+function MusicRocks() {
+  const groups = useRef<(THREE.Group | null)[]>([]);
+  const st = useRef({ t: 0 });
+  useFrame((_, raw) => {
+    const dt = frameDt(raw);
+    st.current.t += dt;
+    const r = fx.rocks;
+    for (let i = 0; i < ROCK_COLORS.length; i++) {
+      const g = groups.current[i];
+      if (!g) continue;
+      const it = r.items[i];
+      const show = r.active && !!it && r.pop > 0.01;
+      g.visible = show;
+      if (!show) continue;
+      it.bounce = Math.max(0, it.bounce - dt * 3.2);
+      it.glow = Math.max(0, it.glow - dt * 2.2);
+      it.hint = Math.max(0, it.hint - dt * 1.2);
+      // a boing when it's tapped, a little wobble when it wants to be
+      const k = Math.sin(it.bounce * Math.PI);
+      g.position.copy(it.pos);
+      g.position.y += 0.1 * k + Math.sin(st.current.t * 2 + i * 1.1) * 0.015;
+      g.scale.set(r.pop * (1 - 0.12 * k), r.pop * (1 + 0.3 * k), r.pop * (1 - 0.12 * k));
+      g.rotation.set(0, i * 0.7, Math.sin(st.current.t * 20) * 0.14 * it.hint);
+      rockMats[i].emissiveIntensity = 0.1 + it.glow * 1.4;
+    }
+  });
+  return (
+    <>
+      {ROCK_COLORS.map((_, i) => (
+        <group key={i} ref={(el) => (groups.current[i] = el)} visible={false}>
+          <mesh geometry={musicRockGeometry()} material={rockMats[i]} castShadow raycast={() => null} />
+          <mesh
+            visible={false}
+            position={[0, 0.2, 0]}
+            onPointerDown={(ev) => {
+              if (!rockTap) return;
+              ev.stopPropagation();
+              rockTap(i);
+            }}
+          >
+            <sphereGeometry args={[0.38, 10, 8]} />
+          </mesh>
+        </group>
+      ))}
+    </>
+  );
+}
+
 // -------------------------------------------------------------- high five
 
 const ringMat = new THREE.MeshBasicMaterial({ color: '#fff3a3', transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false });
@@ -696,6 +983,8 @@ export function EventProps() {
       <Balloons />
       <Fireworks />
       <Bushes />
+      <SnackFruit />
+      <MusicRocks />
       <Pterodactyl />
     </>
   );

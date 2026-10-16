@@ -38,22 +38,42 @@ up (the same explanation is in the parent corner).
        it open, the prize floats out big and spinning, and a big
        "Collect!" button puts it on his dino (caps, sunglasses, a
        basketball jersey, a soccer ball, sneakers, a cape and more)
-     - in between, in turn: a high five with Coach Rex, balloons to pop, a
-       dance party, hide and seek (Coach Rex hides behind one of three
-       bushes, and the one that wiggles is the giveaway), a roar-off, and
-       fireworks Zef taps into the sky
+     - in between, ten games take turns:
+       - a high five with Coach Rex
+       - balloons to pop
+       - snack time: Zef taps fruit on a big leaf and it flies into Coach
+         Rex's mouth (chomp!), until he burps and says "Excuse me!"
+       - a dance party
+       - hide and seek: Coach Rex hides behind one of three bushes, and
+         the one that wiggles is the giveaway
+       - tickle time: tap Coach Rex until he topples over laughing
+       - a roar-off
+       - the dino band: five glowing rocks each play a note over a drum
+         beat while Coach Rex dances
+       - fireworks Zef taps into the sky
+       - dino moves: Zef stands up and stomps, stretches, wiggles, spins
+         or jumps along with Coach Rex, away from the screen
    - **Not dry.** Coach Rex walks over for a big hug ("My arms are tiny,
      but my hugs are huge!"). The underwear meter loses one dot, and every
      star stays.
-3. **See you tomorrow!** A replay button lets Zef watch it again, and a
+3. **A joke or a dino fact.** Before saying goodbye, Coach Rex tells a
+   silly dino joke one morning (with a pause before the punchline and a
+   "ba-dum-tss") and shares a dino fact the next: twelve of each.
+4. **See you tomorrow!** A replay button lets Zef watch it again, and a
    hanger button opens his dino's wardrobe: everything he's collected,
    to put on or take off himself, with Coach Rex reacting to each one. What
    he picks is what his dino wears on the board and the title screen. One
    press counts per morning, and refreshing never replays or double-counts.
 
 Coach Rex has nine ways to say good morning, a dozen cheers for a dry night
-and six goodbyes, and they rotate, so the mornings don't sound the same for
-weeks.
+(and a special one for every tenth star, up to 100), six goodbyes and ten
+things to say when he's tapped, and they rotate, so the mornings don't
+sound the same for weeks.
+
+The board's weather follows the seasons: leaves tumble down in the fall,
+snow falls in the winter, blossom petals drift in the spring and
+butterflies flutter in the summer (the other way round south of the
+equator). Every fourth morning, a rainbow arcs across the sky.
 
 Coach Rex's words show as a caption along the bottom, just above whatever
 buttons are showing.
@@ -200,7 +220,9 @@ npm run build:single # one self-contained HTML file in dist-single/
 
 `?debug` in the URL exposes a small test API on `window.__dino`. With it
 you can seed nights, press the buttons, run previews, and project dinos and
-props to screen positions. The `scripts/dino-*.mjs` files use it with
+props to screen positions. `?season=winter` (or spring, summer, fall),
+`?rainbow` and `?dayshift=1` show other weather, a rainbow, or another
+day's lines. The `scripts/dino-*.mjs` files use it with
 Playwright to play through the title screen, setup and the tap-along
 intro, mornings, chests, the surprises, the wardrobe, the store and the
 parent corner. `scripts/dino-sync.mjs` stands in for the

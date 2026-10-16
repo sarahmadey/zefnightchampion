@@ -35,6 +35,7 @@ import {
   surpriseFor,
   DEFAULT_PRIZES,
 } from '../src/game/rewards';
+import { rainbowDay, seasonFor } from '../src/board/Weather';
 
 const NOW = new Date(2026, 9, 13, 8, 0, 0); // Oct 13 2026, local morning
 const TODAY = '2026-10-13';
@@ -182,23 +183,41 @@ describe('quest', () => {
   });
 });
 
+describe('weather', () => {
+  it('picks the season by month, the other way round south of the equator', () => {
+    expect(seasonFor(new Date(2026, 9, 16), 'America/Los_Angeles')).toBe('fall');
+    expect(seasonFor(new Date(2026, 9, 16), 'Australia/Sydney')).toBe('spring');
+    expect(seasonFor(new Date(2027, 0, 5), 'Europe/London')).toBe('winter');
+    expect(seasonFor(new Date(2027, 6, 5), 'America/New_York')).toBe('summer');
+    expect(seasonFor(new Date(2027, 6, 5), 'America/Argentina/Buenos_Aires')).toBe('winter');
+  });
+
+  it('has a rainbow every fourth morning, but not in the snow', () => {
+    const days = Array.from({ length: 8 }, (_, i) => rainbowDay(new Date(2026, 9, 14 + i, 8), 'America/Los_Angeles'));
+    expect(days.filter(Boolean)).toHaveLength(2);
+    expect(Array.from({ length: 8 }, (_, i) => rainbowDay(new Date(2027, 0, 4 + i, 8), 'America/Los_Angeles')).some(Boolean)).toBe(false);
+  });
+});
+
 describe('surprises and accessories', () => {
   it('hatches an egg on odd stars until every accessory is out', () => {
     expect(surpriseFor(1)).toBe('egg');
     expect(surpriseFor(2)).toBe('highfive');
     expect(surpriseFor(3)).toBe('egg');
-    expect(surpriseFor(4)).toBe('balloons');
-    expect(surpriseFor(6)).toBe('dance');
-    expect(surpriseFor(8)).toBe('peekaboo');
-    expect(surpriseFor(10)).toBe('roar');
-    expect(surpriseFor(12)).toBe('fireworks');
-    expect(surpriseFor(14)).toBe('highfive');
+    // the ten games take turns between eggs
+    expect([4, 6, 8, 10, 12, 14, 16, 18, 20, 22].map(surpriseFor)).toEqual(['balloons', 'snack', 'dance', 'peekaboo', 'tickle', 'roar', 'band', 'fireworks', 'moves', 'highfive']);
     expect(accessoryForStar(1)).toBe(0);
     expect(accessoryForStar(5)).toBe(2);
     expect(accessoryForStar(4)).toBeNull();
     const last = ACCESSORIES.length * 2;
     expect(accessoryForStar(last - 1)).toBe(ACCESSORIES.length - 1);
     expect(surpriseFor(last + 1)).not.toBe('egg');
+  });
+
+  it('plays every game once in ten turns, with no game twice in a row', () => {
+    const after = Array.from({ length: 20 }, (_, i) => surpriseFor(ACCESSORIES.length * 2 + 1 + i));
+    expect(new Set(after.slice(0, 10)).size).toBe(10);
+    for (let i = 1; i < after.length; i++) expect(after[i]).not.toBe(after[i - 1]);
   });
 
   it('unlocks accessories in order and dresses the dino in the newest per slot', () => {

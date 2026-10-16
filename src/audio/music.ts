@@ -1,10 +1,11 @@
 // A cheerful little jungle groove played by WebAudio: marimba chords, a
 // bouncy bass, shakers and a soft kick, scheduled a moment ahead so it stays
-// in time. A calmer, slower mood plays during hugs.
+// in time. A calmer, slower mood plays during hugs, and just the drums and
+// bass while the child plays the dino band's rocks.
 
 import { audioIfReady } from './core';
 
-type Mood = 'play' | 'calm' | 'party';
+type Mood = 'play' | 'calm' | 'party' | 'band';
 
 const CHORDS = [
   [0, 4, 7], // C
@@ -118,7 +119,7 @@ function schedule() {
       // marimba arpeggio pattern
       const pat = [0, -1, 1, -1, 2, -1, 1, 2, 0, -1, 1, -1, 2, 1, -1, 2];
       const k = pat[within];
-      if (k >= 0) marimba(ctx, music, hz(chord[k] + 12 + (within >= 12 && k === 2 ? 12 : 0)), nextTime, 0.2);
+      if (k >= 0 && mood !== 'band') marimba(ctx, music, hz(chord[k] + 12 + (within >= 12 && k === 2 ? 12 : 0)), nextTime, 0.2);
       if (within === 0 || within === 8 || (mood === 'party' && within % 4 === 0)) kick(ctx, music, nextTime);
       if (within % 2 === 0) shaker(ctx, music, nextTime, within % 4 === 2 ? 0.12 : 0.06);
       if (within === 0 || within === 6 || within === 10) bass(ctx, music, hz(chord[0] - 24 + (within === 10 ? 7 : 0)), nextTime, 0.3);

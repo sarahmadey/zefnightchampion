@@ -4,17 +4,17 @@
 //   -> a celebration or a hug -> see you tomorrow
 //
 // A dry morning: a star flies to the next stone, Zef's dino hops onto it, the
-// underpants meter ticks up and one surprise plays (an egg with a new
-// accessory, a high five, a dance party or a roar-off). Reaching the end of a
-// land opens a prize chest; filling the meter opens the Underpants Store.
-// A wet morning: Coach Rex walks over for a big hug, the meter starts fresh,
-// and every star stays.
+// underwear meter ticks up and one surprise plays (an egg with a new
+// accessory, or one of ten little games with Coach Rex). Reaching the end of a
+// land opens a prize chest; filling the meter opens the Underwear Store.
+// A wet morning: Coach Rex walks over for a big hug, the meter loses a dot,
+// and every star stays. Every morning ends with a joke or a dino fact.
 //
 // Progress comes only from the save; the director compares it with what the
 // child has already seen, so refreshes never replay or double-count.
 
 import * as THREE from 'three';
-import { Cancelled, cam, clock, coach, hero, play, type DinoActor } from './actors';
+import { Cancelled, cam, clock, coach, hero, play, type DinoAction, type DinoActor } from './actors';
 import { motion } from './settings';
 import { bus } from './bus';
 import { sfx } from '../audio/sfx';
@@ -26,7 +26,23 @@ import { computeQuest, landOf, landRange, prizesEarned, todayKey, type DateKey, 
 import { ACCESSORIES, accessoriesUnlocked, accessoryForStar, prizeAt, resolveOutfit, surpriseFor, type Prize, type Species } from './rewards';
 import { chestPos, groundHeight, landCurve, restPos, spacePos, storeLandmarkPos } from '../board/layout';
 import { chestAnim, onChestTap } from '../board/Chest';
-import { MAX_BALLOONS, flyStar, fx, launchFirework, onBalloonTap, onBushTap, onEggTap, onHandTap, onIntroStarTap, onPrizeTap, onSkyTap } from '../board/EventProps';
+import {
+  FRUIT,
+  MAX_BALLOONS,
+  ROCK_COLORS,
+  flyStar,
+  fx,
+  launchFirework,
+  onBalloonTap,
+  onBushTap,
+  onEggTap,
+  onFruitTap,
+  onHandTap,
+  onIntroStarTap,
+  onPrizeTap,
+  onRockTap,
+  onSkyTap,
+} from '../board/EventProps';
 import { pedestalHeight, pedestalPos, STORE_ORIGIN } from '../store/StoreScene';
 import { lineup } from '../setup/SetupStage';
 import { voice } from '../voice/voice';
@@ -98,18 +114,39 @@ function goal() {
 }
 
 /** Today as a day count, so lines that rotate daily change every morning. */
+/** Test hook (`?dayshift=1` with `?debug`): pretend it's another day, to hear other lines. */
+export const dayShift = { days: 0 };
+
 function dayIndex(): number {
   const d = new Date();
-  return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000);
+  return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000) + dayShift.days;
 }
 
 const GREETINGS = ['greet-1', 'greet-2', 'greet-3', 'greet-4', 'greet-5', 'greet-6', 'greet-7', 'greet-8', 'greet-9'];
 const DRY_CHEERS = ['dry-1', 'dry-2', 'dry-3', 'dry-4', 'dry-5', 'dry-6', 'dry-7', 'dry-8', 'dry-9', 'dry-10', 'dry-11', 'dry-12'];
 const GOODBYES = ['bye-1', 'bye-2', 'bye-3', 'bye-4', 'bye-5', 'bye-6'];
 
-/** The dry-night cheer for star `n` (they take turns, so they don't repeat for 12 mornings). */
+/**
+ * The dry-night cheer for star `n`: every tenth star up to 100 has its own,
+ * and the rest take turns, so they don't repeat for 12 mornings.
+ */
 function dryCheer(n: number): string {
+  if (n >= 10 && n <= 100 && n % 10 === 0) return `stars-${n}`;
   return DRY_CHEERS[Math.max(0, n - 1) % DRY_CHEERS.length];
+}
+
+const JOKES = 12;
+const FACTS = 12;
+
+/** Today's little extra before the goodbye: a joke one day, a dino fact the next. */
+function todaysExtra(): string[] {
+  const day = dayIndex();
+  const k = Math.floor(day / 2);
+  if (day % 2 === 0) {
+    const j = (k % JOKES) + 1;
+    return [`joke-time-${(k % 2) + 1}`, `joke-${j}-q`, `joke-${j}-a`];
+  }
+  return [`fact-time-${(k % 2) + 1}`, `fact-${(k % FACTS) + 1}`];
 }
 
 function prefetch(ids: string[]) {
@@ -327,11 +364,20 @@ function clearProps() {
   fx.hand.visible = false;
   fx.ptero.visible = false;
   fx.star.active = false;
-  // and what a moment cut short leaves on the dinos: a look at the sky, a squash, a jump
+  fx.fruit.active = false;
+  fx.rocks.active = false;
+  onFruitTap(null);
+  onRockTap(null);
+  tickleTap = null;
+  dancing = false;
+  roaring = false;
+  music.setMood('play');
+  // and what a moment cut short leaves on the dinos: a look at the sky, a squash, a jump, an open mouth
   for (const a of [hero, coach]) {
     a.look = null;
     a.stretch = 1;
     a.air = 0;
+    a.expression = 'smile';
   }
 }
 
@@ -538,7 +584,7 @@ async function playPending(ctx: Ctx) {
   const q = computeQuest(d.records, d.rules);
   const g = useGame.getState();
   const latestDry = q.latest?.result === 'dry';
-  prefetch([dryCheer(q.stars), 'first-star', 'wet-1', 'wet-4', 'wet-5', 'wet-2', 'wet-3', 'wet-3-kind', GOODBYES[dayIndex() % GOODBYES.length]]);
+  prefetch([dryCheer(q.stars), 'first-star', 'wet-1', 'wet-4', 'wet-5', 'wet-2', 'wet-3', 'wet-3-kind', ...todaysExtra(), GOODBYES[dayIndex() % GOODBYES.length]]);
 
   // 1. a chest the child is already past but hasn't opened (the prize schedule
   //    gained one): open the one just behind them, and settle older ones quietly
@@ -738,6 +784,10 @@ async function surprise(ctx: Ctx, star: number, preview: boolean, kind = surpris
   else if (kind === 'balloons') await balloonPop(ctx);
   else if (kind === 'fireworks') await fireworksShow(ctx);
   else if (kind === 'peekaboo') await hideAndSeek(ctx);
+  else if (kind === 'tickle') await tickleTime(ctx);
+  else if (kind === 'snack') await snackTime(ctx);
+  else if (kind === 'moves') await dinoMoves(ctx, star);
+  else if (kind === 'band') await dinoBand(ctx);
   else await roarOff(ctx);
 }
 
@@ -1101,6 +1151,332 @@ async function eggSurprise(ctx: Ctx, star: number, preview: boolean) {
 
 let collectTap: (() => void) | null = null;
 
+// ------------------------------------------------------------ tickle, snack, moves, band
+
+let tickleTap: (() => void) | null = null;
+
+/**
+ * A wider shot for the games played with things in front of the dinos (and
+ * for the dino moves, arms up high): both dinos and the props all in view,
+ * on wide screens too.
+ */
+function stageShot(toCam: THREE.Vector3, forward = 0.7, height = 0.8) {
+  const mid = hero.pos.clone().lerp(coach.pos, 0.5);
+  const look = mid.clone().addScaledVector(toCam, forward).setY(mid.y + height);
+  shot(look.clone().addScaledVector(toCam, 6.4).setY(look.y + 2.4), look, 2.2, 4.6);
+}
+
+/** Tickle time: tap Coach Rex until he topples over laughing. */
+async function tickleTime(ctx: Ctx) {
+  const { toCam } = viewAxes();
+  faceCamera(coach);
+  shot(coach.pos.clone().addScaledVector(toCam, 4.8).setY(coach.pos.y + 2.2), coach.pos.clone().setY(coach.pos.y + 1.3), 2, 3.6);
+  play(coach, 'point', 1.6);
+  await say(ctx, 'tickle', 0.1);
+  let taps = 0;
+  let last = clock.time;
+  const tickle = () => {
+    taps++;
+    last = clock.time;
+    sfx.play('giggle');
+    play(coach, taps % 3 === 0 ? 'wiggle' : 'giggle', 0.9);
+    coach.expression = 'happy';
+    burst('sparkle', coach.pos.clone().setY(coach.pos.y + 1.5), { count: 6 + taps * 2, speed: 2.6, colors: ['#fff3a8', '#ffffff', '#ffc9de'] });
+    if (taps === 2) sayAsync('tap-3');
+    else if (taps === 5) sayAsync('tickle-lots');
+  };
+  tickleTap = tickle;
+  useGame.getState().set({ awaiting: 'tickle' });
+  const t0 = clock.time;
+  let helping = false;
+  try {
+    await ctx.until(() => {
+      // nobody tickling (or stopped)? Zef's dino joins in
+      if (!helping && clock.time - last > (taps === 0 ? 7 : 4)) helping = true;
+      if (helping && clock.time - last > 0.7) {
+        play(hero, 'point', 0.6);
+        tickle();
+      }
+      return taps >= 8 || clock.time - t0 > 20;
+    }, 24);
+  } finally {
+    tickleTap = null;
+    useGame.getState().set({ awaiting: null });
+  }
+  // he topples over, laughing
+  sfx.play('giggle');
+  play(coach, 'sit', 99, true);
+  burst('confetti', coach.pos.clone().setY(coach.pos.y + 1.2), { count: 26 });
+  await ctx.wait(0.5);
+  sfx.play('giggle');
+  play(hero, 'giggle', 1.4);
+  hero.expression = 'happy';
+  await say(ctx, 'tickle-done', 0.1);
+  play(coach, 'none');
+  coach.expression = 'smile';
+}
+
+/** Snack time: tap the fruit and it flies into Coach Rex's mouth. Chomp! */
+async function snackTime(ctx: Ctx) {
+  const { toCam, side } = viewAxes();
+  const mid = hero.pos.clone().lerp(coach.pos, 0.5).addScaledVector(toCam, 1.5);
+  mid.y = groundHeight(mid.x, mid.z);
+  const n = FRUIT.length;
+  const f = fx.fruit;
+  f.leaf.copy(mid).setY(mid.y + 0.03);
+  f.heading = Math.atan2(toCam.x, toCam.z);
+  f.items = Array.from({ length: n }, (_, i) => {
+    const pos = mid.clone().addScaledVector(side, (i - (n - 1) / 2) * 0.55);
+    pos.y = Math.max(groundHeight(pos.x, pos.z), mid.y) + 0.06;
+    return { pos, from: pos.clone(), to: new THREE.Vector3(), fly: 0, flying: false, landed: false, chewed: false };
+  });
+  f.pop = 0;
+  f.active = true;
+  sfx.play('magic');
+  let start = clock.time;
+  for (;;) {
+    await ctx.wait(0);
+    const u = clamp((clock.time - start) / 0.45, 0, 1);
+    f.pop = ease.outBack(u);
+    if (u >= 1) break;
+  }
+  faceCamera(coach);
+  stageShot(toCam);
+  play(coach, 'nod', 1.2);
+  await say(ctx, 'snack', 0.1);
+  // mouth open, waiting; the fruit goes just in front of his snout
+  coach.expression = 'wow';
+  const mouth = () => coach.slots.face.clone().addScaledVector(toCam, 0.3).add(new THREE.Vector3(0, -0.22, 0));
+  let eaten = 0;
+  let last = clock.time;
+  let chewing = 0;
+  const toss = (i: number) => {
+    const it = f.items[i];
+    if (!it || it.flying) return;
+    it.flying = true;
+    it.fly = 0;
+    it.from.copy(it.pos);
+    it.to.copy(mouth());
+    last = clock.time;
+    sfx.play('toss');
+  };
+  onFruitTap(toss);
+  useGame.getState().set({ awaiting: 'snack' });
+  const t0 = clock.time;
+  try {
+    await ctx.until(() => {
+      f.items.forEach((it, i) => {
+        if (!it.landed || it.chewed) return;
+        // chomp!
+        it.chewed = true;
+        eaten++;
+        chewing = clock.time + 0.7;
+        sfx.play('chomp');
+        play(coach, 'nod', 0.8);
+        coach.expression = 'happy';
+        burst('confetti', it.to.clone(), { count: 10, speed: 2.2, colors: FRUIT[i].crumbs });
+        if (eaten === 2) sayAsync('snack-yum');
+        else if (eaten === 4) sayAsync('snack-more');
+      });
+      if (eaten < n && clock.time > chewing) coach.expression = 'wow';
+      // no taps for a while? Coach Rex helps himself to the next one
+      if (clock.time - last > (eaten === 0 ? 8 : 5) || clock.time - t0 > 26) {
+        const next = f.items.findIndex((it) => !it.flying);
+        if (next >= 0) toss(next);
+      }
+      return eaten >= n;
+    }, 45);
+  } finally {
+    onFruitTap(null);
+    useGame.getState().set({ awaiting: null });
+  }
+  await ctx.wait(0.4);
+  // that was a lot of fruit
+  sfx.play('burp');
+  coach.expression = 'wow';
+  play(coach, 'show', 1.2);
+  burst('puff', mouth(), { count: 6, size: 0.3, speed: 0.8 });
+  await ctx.wait(0.9);
+  sfx.play('giggle');
+  play(hero, 'giggle', 1.4);
+  hero.expression = 'happy';
+  coach.expression = 'happy';
+  await say(ctx, 'snack-done', 0.1);
+  start = clock.time;
+  for (;;) {
+    await ctx.wait(0);
+    const u = clamp((clock.time - start) / 0.35, 0, 1);
+    f.pop = 1 - u;
+    if (u >= 1) break;
+  }
+  f.active = false;
+  coach.expression = 'smile';
+}
+
+/** The moves Coach Rex leads, three a morning; the child does them for real, away from the screen. */
+const DINO_MOVES: { line: string; act: DinoAction | 'jump'; dur: number }[] = [
+  { line: 'move-stomp', act: 'stomp', dur: 4 },
+  { line: 'move-stretch', act: 'stretch', dur: 3.6 },
+  { line: 'move-wiggle', act: 'wiggle', dur: 3.8 },
+  { line: 'move-spin', act: 'spin', dur: 1.3 },
+  { line: 'move-hop', act: 'jump', dur: 0.55 },
+];
+
+/** Both dinos jump together, once. */
+async function jumpBoth(ctx: Ctx, dur: number) {
+  sfx.play('hop');
+  const start = clock.time;
+  for (;;) {
+    await ctx.wait(0);
+    const u = clamp((clock.time - start) / dur, 0, 1);
+    const h = Math.sin(u * Math.PI);
+    hero.air = h * 0.55;
+    coach.air = h * 0.45;
+    hero.stretch = coach.stretch = 1 + 0.12 * h;
+    if (u >= 1) break;
+  }
+  hero.air = coach.air = 0;
+  hero.stretch = coach.stretch = 1;
+  sfx.play('land');
+  cam.shake = 0.04;
+  await ctx.wait(0.15);
+}
+
+/** Dino moves: stand up and stomp, stretch, wiggle, spin or jump along with Coach Rex. */
+async function dinoMoves(ctx: Ctx, star: number) {
+  stageShot(viewAxes().toCam, 0, 1.3);
+  music.setMood('party');
+  play(coach, 'wave', 1.2);
+  await say(ctx, 'moves', 0.2);
+  const off = bus.on('stomp', () => {
+    cam.shake = 0.06;
+    sfx.play('stomp');
+  });
+  try {
+    const first = (Math.floor(star / 2) + dayIndex()) % DINO_MOVES.length;
+    for (let k = 0; k < 3; k++) {
+      const m = DINO_MOVES[(first + k) % DINO_MOVES.length];
+      const talking = say(ctx, m.line, 0.1);
+      talking.catch(() => undefined);
+      if (m.act === 'jump') {
+        for (let j = 0; j < 3; j++) await jumpBoth(ctx, m.dur);
+      } else if (m.act === 'spin') {
+        for (let j = 0; j < 2; j++) {
+          play(hero, 'spin', m.dur);
+          play(coach, 'spin', m.dur);
+          sfx.play('whoosh');
+          await ctx.wait(m.dur + 0.1);
+        }
+      } else {
+        play(hero, m.act, m.dur);
+        play(coach, m.act, m.dur);
+      }
+      await talking;
+      await ctx.wait(0.5);
+      if (k < 2) {
+        sfx.play('ding');
+        burst('sparkle', hero.pos.clone().setY(hero.pos.y + 1.2), { count: 14 });
+      }
+    }
+  } finally {
+    off();
+  }
+  music.setMood('play');
+  play(hero, 'cheer', 1.4);
+  play(coach, 'cheer', 1.4);
+  burst('confetti', hero.pos.clone().lerp(coach.pos, 0.5).setY(hero.pos.y + 1.6), { count: 36 });
+  await say(ctx, 'moves-done', 0.2);
+}
+
+/** The dino band: tap the rocks to play music while Coach Rex dances. */
+async function dinoBand(ctx: Ctx) {
+  const { toCam, side } = viewAxes();
+  const mid = hero.pos.clone().lerp(coach.pos, 0.5).addScaledVector(toCam, 1.6);
+  const n = ROCK_COLORS.length;
+  const r = fx.rocks;
+  r.items = Array.from({ length: n }, (_, i) => {
+    // low notes on the left of the screen (`side` points left), in a gentle arc
+    const pos = mid
+      .clone()
+      .addScaledVector(side, (2 - i) * 0.62)
+      .addScaledVector(toCam, -Math.abs(i - 2) * 0.16);
+    pos.y = groundHeight(pos.x, pos.z);
+    return { pos, bounce: 0, glow: 0, hint: 0 };
+  });
+  const ring = (i: number) => {
+    const it = r.items[i];
+    it.bounce = 1;
+    it.glow = 1;
+    sfx.play('note', i);
+    burst('note', it.pos.clone().setY(it.pos.y + 0.55), { count: 2, colors: [ROCK_COLORS[i]] });
+  };
+  r.pop = 0;
+  r.active = true;
+  stageShot(toCam);
+  sfx.play('magic');
+  let start = clock.time;
+  for (;;) {
+    await ctx.wait(0);
+    const u = clamp((clock.time - start) / 0.45, 0, 1);
+    r.pop = ease.outBack(u);
+    if (u >= 1) break;
+  }
+  // each rock sings its note
+  for (let i = 0; i < n; i++) {
+    ring(i);
+    await ctx.wait(0.16);
+  }
+  await say(ctx, 'band', 0.1);
+  music.setMood('band');
+  let notes = 0;
+  let first = -1;
+  let last = clock.time;
+  onRockTap((i) => {
+    ring(i);
+    notes++;
+    last = clock.time;
+    if (first < 0) first = clock.time;
+    play(coach, notes % 2 ? 'wiggle' : 'twist', 1.2);
+    if (notes % 3 === 0) play(hero, 'nod', 0.8);
+    if (notes === 7) sayAsync('band-more');
+  });
+  useGame.getState().set({ awaiting: 'band' });
+  const t0 = clock.time;
+  let hinted = clock.time;
+  try {
+    await ctx.until(() => {
+      // waiting for a tap: a rock wobbles to say "tap me"
+      if (clock.time - last > 4 && clock.time - hinted > 2) {
+        hinted = clock.time;
+        r.items[Math.floor(Math.random() * n)].hint = 1;
+      }
+      return notes >= 16 || (first >= 0 && clock.time - first > 15) || (notes > 0 && clock.time - last > 6) || clock.time - t0 > 24;
+    }, 28);
+  } finally {
+    onRockTap(null);
+    useGame.getState().set({ awaiting: null });
+  }
+  music.setMood('play');
+  // the big finish: a run up the rocks
+  for (let i = 0; i < n; i++) {
+    ring(i);
+    await ctx.wait(0.1);
+  }
+  sfx.play('fanfare');
+  play(hero, 'cheer', 1.4);
+  play(coach, 'cheer', 1.4);
+  burst('note', hero.pos.clone().lerp(coach.pos, 0.5).setY(hero.pos.y + 1.6), { count: 10 });
+  await say(ctx, 'band-done', 0.2);
+  start = clock.time;
+  for (;;) {
+    await ctx.wait(0);
+    const u = clamp((clock.time - start) / 0.35, 0, 1);
+    r.pop = 1 - u;
+    if (u >= 1) break;
+  }
+  r.active = false;
+}
+
 // ------------------------------------------------------------ wardrobe
 
 /** What Zef's dino is wearing right now. */
@@ -1309,6 +1685,10 @@ export function tapHero() {
 let coachTapN = 0;
 export function tapCoach() {
   const g = useGame.getState();
+  if (g.awaiting === 'tickle') {
+    tickleTap?.();
+    return;
+  }
   if (g.awaiting === 'highfive') {
     // tapping anywhere on the coach counts as a high five too
     highFiveSlap?.();
@@ -1318,7 +1698,7 @@ export function tapCoach() {
   coachTapN++;
   play(coach, coachTapN % 2 ? 'giggle' : 'wave', 1.2);
   sfx.play('boing');
-  const lines = ['tap-1', 'tap-2', 'tap-3', 'tap-4'];
+  const lines = ['tap-1', 'tap-2', 'tap-3', 'tap-4', 'tap-5', 'tap-6', 'tap-7', 'tap-8', 'tap-9', 'tap-10'];
   sayAsync(lines[coachTapN % lines.length]);
 }
 
@@ -1510,15 +1890,46 @@ async function storeVisit(ctx: Ctx, preview: boolean) {
 // ------------------------------------------------------------ goodbye
 
 async function goodbye(ctx: Ctx) {
+  await jokeOrFact(ctx);
   boardCamera(1.8);
   faceCamera(hero);
   faceCamera(coach);
   play(hero, 'wave', 1.6);
   play(coach, 'wave', 1.6);
-  const d = new Date();
-  void d;
   await say(ctx, GOODBYES[dayIndex() % GOODBYES.length]);
   finishMorning();
+}
+
+/** A joke one morning (with a beat before the punchline, and a ba-dum-tss), a dino fact the next. */
+async function jokeOrFact(ctx: Ctx) {
+  const [intro, a, b] = todaysExtra();
+  closeShot(2);
+  faceCamera(hero);
+  faceCamera(coach);
+  play(coach, 'point', 1.2);
+  await say(ctx, intro, 0.2);
+  if (b) {
+    await say(ctx, a, 0.1);
+    play(coach, 'nod', 1);
+    play(hero, 'nod', 1);
+    await ctx.wait(1);
+    await say(ctx, b, 0);
+    sfx.play('rimshot');
+    play(coach, 'giggle', 1.6);
+    play(hero, 'giggle', 1.6);
+    hero.expression = 'happy';
+    await ctx.wait(0.4);
+    sfx.play('giggle');
+    await ctx.wait(0.6);
+  } else {
+    play(coach, 'show', 1.8);
+    sfx.play('sparkle');
+    await say(ctx, a, 0.1);
+    hero.expression = 'wow';
+    play(hero, 'nod', 1);
+    await ctx.wait(0.8);
+  }
+  hero.expression = 'smile';
 }
 
 // ------------------------------------------------------------ replay & previews
@@ -1572,7 +1983,7 @@ export function startPreview(kind: PreviewKind, fromChild = false) {
       await storeVisit(ctx, true);
     } else if (kind === 'surprise') {
       // one of the surprises between eggs, a different one each time
-      const kinds = ['balloons', 'fireworks', 'peekaboo', 'highfive', 'dance', 'roar'] as const;
+      const kinds = ['tickle', 'snack', 'band', 'moves', 'balloons', 'fireworks', 'peekaboo', 'highfive', 'dance', 'roar'] as const;
       surpriseTurn = (surpriseTurn + 1) % kinds.length;
       await surprise(ctx, Math.max(1, stars), true, kinds[surpriseTurn]);
     } else if (kind === 'intro') {
@@ -1605,6 +2016,8 @@ async function celebrateStarsPreview(ctx: Ctx, from: number, to: number) {
 }
 
 async function goodbyePreview(ctx: Ctx) {
+  // watching it again includes today's joke or dino fact
+  if (useGame.getState().preview?.replay) await jokeOrFact(ctx);
   boardCamera(1.8);
   play(hero, 'wave', 1.4);
   play(coach, 'wave', 1.4);
