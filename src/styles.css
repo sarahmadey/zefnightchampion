@@ -721,6 +721,17 @@ summary {
   100% { transform: scale(1); }
 }
 
+.hud > .meter.tappable {
+  pointer-events: auto;
+  cursor: pointer;
+  animation: meter-pulse 1s ease-in-out infinite;
+}
+
+@keyframes meter-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
 .meter-count {
   font-size: 12px;
   font-weight: 700;
@@ -902,6 +913,127 @@ summary {
 .round-btn:active {
   transform: translateY(4px);
   box-shadow: 0 2px 0 #1c7ed6, 0 6px 14px rgba(20, 80, 160, 0.35);
+}
+
+.round-btn.dress {
+  background: linear-gradient(180deg, #d0bfff, #9775fa);
+  box-shadow: 0 6px 0 #7048e8, 0 10px 22px rgba(80, 40, 160, 0.35);
+}
+
+.round-btn.dress:active {
+  box-shadow: 0 2px 0 #7048e8, 0 6px 14px rgba(80, 40, 160, 0.35);
+}
+
+.round-btn.dress svg {
+  width: 36px;
+  height: 36px;
+}
+
+.wardrobe {
+  width: min(560px, 100%);
+  max-height: 46vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  border-radius: 26px;
+  background: rgba(255, 255, 250, 0.94);
+  box-shadow: 0 10px 30px rgba(30, 70, 30, 0.25);
+  animation: rise 0.35s ease both;
+}
+
+.wardrobe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 10px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.wardrobe-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  background: radial-gradient(circle at 50% 40%, #ffffff, #e9f5df);
+  box-shadow: 0 3px 8px rgba(30, 70, 30, 0.18);
+  padding: 4px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.wardrobe-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.wardrobe-item.worn {
+  border-color: #2f9e44;
+  background: radial-gradient(circle at 50% 40%, #ffffff, #d3f9d8);
+}
+
+.wardrobe-item:active {
+  transform: scale(0.94);
+}
+
+.worn-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2f9e44;
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.worn-badge svg {
+  width: 18px;
+  height: 18px;
+}
+
+.thumb-wait {
+  width: 40%;
+  height: 40%;
+  border-radius: 50%;
+  background: #dbe8d0;
+  animation: breathe 1s ease-in-out infinite;
+}
+
+.wardrobe-item.mystery {
+  border: 3px dashed #c0d4b0;
+  background: rgba(255, 255, 255, 0.6);
+  color: #9bb08c;
+  font-family: var(--font);
+  font-size: 30px;
+  font-weight: 900;
+  cursor: default;
+  box-shadow: none;
+}
+
+.wardrobe-done {
+  align-self: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: none;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(180deg, #69db7c, #2f9e44);
+  box-shadow: 0 6px 0 #237032, 0 10px 22px rgba(20, 80, 30, 0.35);
+  cursor: pointer;
+}
+
+.wardrobe-done:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #237032, 0 6px 14px rgba(20, 80, 30, 0.35);
 }
 
 .skip-btn {
@@ -1251,6 +1383,37 @@ summary {
 
 .how-sheet .sticky-actions {
   background: linear-gradient(transparent, var(--surface) 28%);
+}
+
+.meter-mode {
+  margin: 12px 0 4px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meter-mode legend {
+  padding: 0 4px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.meter-mode label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.meter-mode input {
+  margin-top: 3px;
+  width: 20px;
+  height: 20px;
+  flex: none;
 }
 
 .setup-actions {

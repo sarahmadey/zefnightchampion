@@ -22,6 +22,7 @@ import {
   sortedKeys,
   todayKey,
   type DateKey,
+  type MeterMode,
   type NightResult,
 } from '../state/progress';
 import { exportBackup, parseBackup, type SaveData } from '../state/save';
@@ -289,7 +290,18 @@ function consequence(data: SaveData, date: DateKey, result: NightResult | null):
     parts.push(`Stars go from ${before.stars} to ${after.stars} (the board settles quietly, with no "taking away" on screen).`);
   }
   if (result === 'wet' && after.latest?.date === date) {
-    parts.push(`Coach Rex gives ${name} a big hug. The underwear meter starts fresh; all ${after.stars} stars stay.`);
+    // a dry night turned not-dry takes off its own dot too
+    const from = Math.min(before.meter, goal);
+    const to = Math.min(after.meter, goal);
+    const meterNote =
+      data.rules.meter === 'streak'
+        ? 'The underwear meter starts fresh'
+        : from === to
+          ? `The underwear meter stays ${to >= goal ? 'full' : `at ${to}`}`
+          : from - to === 1
+            ? 'The underwear meter loses one dot'
+            : `The underwear meter goes from ${from} to ${to} dots`;
+    parts.push(`Coach Rex gives ${name} a big hug. ${meterNote}; all ${after.stars} stars stay.`);
   } else if (after.meter !== before.meter) {
     if (after.goalReachedOn && !before.goalReachedOn && !data.underpants.earned) parts.push('The underwear meter fills up — the Underwear Store opens!');
     else parts.push(`The underwear meter becomes ${Math.min(after.meter, goal)} of ${goal}.`);
@@ -298,11 +310,23 @@ function consequence(data: SaveData, date: DateKey, result: NightResult | null):
   return parts.join(' ');
 }
 
-/** Average mornings until `n` dry nights in a row, at dry rate `p`. */
-function expectedWait(p: number, n: number): number {
+/**
+ * Average mornings to fill a meter of `n`, at dry rate `p`: `n` dry nights in
+ * a row (classic), or, for the kinder meter, a dot up for each dry night and
+ * one down for each wet one (never below zero).
+ */
+function expectedWait(p: number, n: number, mode: MeterMode): number {
   if (p >= 0.999) return n;
   if (p <= 0.01) return Infinity;
-  return (1 / Math.pow(p, n) - 1) / (1 - p);
+  if (mode === 'streak') return (1 / Math.pow(p, n) - 1) / (1 - p);
+  // mornings to climb from k to k+1: from 0 a wet night stays at 0
+  let step = 1 / p;
+  let total = step;
+  for (let k = 1; k < n; k++) {
+    step = (1 + (1 - p) * step) / p;
+    total += step;
+  }
+  return total;
 }
 
 function friendlyDuration(days: number): string {
@@ -530,31 +554,64 @@ export function ParentPanel() {
               </dd>
             </div>
           </dl>
-          <p className="muted small">The meter counts dry mornings since the last not-dry one. Stars never go away.</p>
+          <p className="muted small">
+            {data.rules.meter === 'streak'
+              ? 'The meter counts dry mornings since the last not-dry one. Stars never go away.'
+              : 'A dry morning adds a dot to the meter and a not-dry one takes a dot away. Stars never go away.'}
+          </p>
         </section>
 
         <section className="card">
           <h2>Underwear goal</h2>
-          <p className="muted small">Dry nights in a row needed to fill the meter and open the Underwear Store.</p>
+          <p className="muted small">
+            {data.rules.meter === 'streak'
+              ? 'Dry nights in a row needed to fill the meter and open the Underwear Store.'
+              : 'Dots needed to fill the meter and open the Underwear Store. Each dry night adds a dot.'}
+          </p>
           <GoalChips label="Quick picks" />
           <p className="muted small">Coach Rex says the number out loud in his intro for 3, 5, 10, 15 or 20 nights. For any other number, pick it here:</p>
           <div className="row stepper">
             <button className="btn" aria-label="Fewer nights" disabled={goal <= GOAL_MIN} onClick={() => useSave.getState().setGoal(goal - 1)}>
               −
             </button>
-            <strong className="stepper-value">{goal} nights</strong>
+            <strong className="stepper-value">
+              {goal} {data.rules.meter === 'streak' ? 'nights' : 'dots'}
+            </strong>
             <button className="btn" aria-label="More nights" disabled={goal >= GOAL_MAX} onClick={() => useSave.getState().setGoal(goal + 1)}>
               +
             </button>
           </div>
           {recorded >= 7 ? (
             <p className="note">
-              Lately {name} has been dry {rate.dry} of {recorded} recorded nights. At that rate, {goal} in a row takes {friendlyDuration(expectedWait(p, goal))} on
-              average{p < 0.85 && goal > 10 ? ' — a smaller goal might feel more reachable for now; you can raise it later' : ''}.
+              Lately {name} has been dry {rate.dry} of {recorded} recorded nights. At that rate,{' '}
+              {data.rules.meter === 'streak' ? `${goal} in a row takes` : `filling all ${goal} dots takes`}{' '}
+              {friendlyDuration(expectedWait(p, goal, data.rules.meter))} on average
+              {p < 0.85 && goal > 10 ? ' — a smaller goal might feel more reachable for now; you can raise it later' : ''}.
             </p>
           ) : (
             <p className="muted small">After a week of mornings, this shows how long the goal is likely to take.</p>
           )}
+          <fieldset className="meter-mode">
+            <legend>When a night isn't dry</legend>
+            <label>
+              <input type="radio" name="meter-mode" checked={data.rules.meter !== 'streak'} onChange={() => useSave.getState().setMeterMode('kind')} />
+              <span>
+                Take one dot off the meter <span className="muted">(kinder: a few accidents don't undo all the hard work)</span>
+              </span>
+            </label>
+            <label>
+              <input type="radio" name="meter-mode" checked={data.rules.meter === 'streak'} onChange={() => useSave.getState().setMeterMode('streak')} />
+              <span>
+                Start the meter over <span className="muted">(the classic way: dry nights in a row)</span>
+              </span>
+            </label>
+            {data.rules.meter !== 'streak' && data.rules.kindFrom && sortedKeys(data.records)[0] < data.rules.kindFrom && (
+              <p className="muted small">
+                {name}'s adventure began before the kinder meter, so it counts this way from {formatKeyShort(data.rules.kindFrom)} on. Earlier nights stay as they
+                were counted, so the meter didn't jump.
+              </p>
+            )}
+          </fieldset>
           {data.underpants.earned && !q.goalReachedOn && (
             <button
               className="btn small ghost"
@@ -575,7 +632,8 @@ export function ParentPanel() {
         <section className="card">
           <h2>Prizes</h2>
           <p className="muted small">
-            A treasure chest opens at {prizeThreshold(0, data.rules)} stars, then every {data.rules.prizeEvery} stars. When the list runs out it starts over.
+            Treasure chests open at {[0, 1, 2, 3].map((i) => prizeThreshold(i, data.rules)).join(', ')} stars, then every {data.rules.prizeEvery} stars after
+            that. When the list runs out it starts over.
           </p>
           <ol className="prize-list">
             {data.prizes.map((pz, i) => (
@@ -677,6 +735,9 @@ export function ParentPanel() {
             </button>
             <button className="btn small" onClick={() => startPreview('wet')}>
               The hug
+            </button>
+            <button className="btn small" onClick={() => startPreview('surprise')}>
+              A surprise (a new one each tap)
             </button>
             <button className="btn small" onClick={() => startPreview('prize')}>
               A prize chest

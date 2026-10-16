@@ -3,13 +3,14 @@
 // screen ("For grown-ups: how it works") and the grown-up corner.
 
 import { useEffect, useRef } from 'react';
-import { useGame } from '../state/store';
+import { useGame, useSave } from '../state/store';
 import { BigHeartIcon, BigSunIcon, ChestIcon, StarIcon, UnderpantsIcon } from './icons';
 
 export const HOW_LEAD =
   'Dino Underwear Quest is a quick morning game for kids who are learning to stay dry at night. It turns every morning into a little celebration, so your child gets excited about wearing underwear to bed instead of diapers.';
 
 export function HowItWorksSteps() {
+  const kind = useSave((s) => s.data.rules.meter) !== 'streak';
   return (
     <ol className="how-steps">
       <li>
@@ -48,7 +49,8 @@ export function HowItWorksSteps() {
           <ChestIcon size={30} />
         </span>
         <p>
-          <strong>Treasure chests</strong> along the way hold real prizes that you hand out, like a movie night or a treat. You choose the prizes.
+          <strong>Treasure chests</strong> along the way hold real prizes that you hand out, like a movie night or a treat. The first one is just 5 dry
+          nights away, and you choose the prizes.
         </p>
       </li>
       <li>
@@ -56,8 +58,11 @@ export function HowItWorksSteps() {
           <UnderpantsIcon size={34} />
         </span>
         <p>
-          <strong>The underwear meter</strong> fills up with dry nights in a row. When it's full, your child is ready to wear underwear at night, and picks
-          out a pair for their dino too!
+          <strong>The underwear meter</strong>{' '}
+          {kind
+            ? "gets a dot for every dry night, and a not-dry night only takes one away, so a few accidents never undo all their hard work. When it's full,"
+            : "fills up with dry nights in a row. When it's full,"}{' '}
+          your child is ready to wear underwear at night, and picks out a pair for their dino too!
         </p>
       </li>
     </ol>

@@ -14,7 +14,7 @@ import { spacePos, storeLandmarkPos } from './layout';
 import { Dino } from '../dino/Dino';
 import { coach, hero } from '../game/actors';
 import { boardView } from '../game/CameraRig';
-import { DINO_COLORS, defaultOutfit, prizeAt, ACCESSORIES, type DinoColor, type Slot } from '../game/rewards';
+import { DINO_COLORS, prizeAt, resolveOutfit, type DinoColor, type Slot } from '../game/rewards';
 import { tapCoach, tapHero } from '../game/director';
 
 export const COACH_COLOR: DinoColor = { name: 'Coach', body: '#2bb59f', belly: '#fff3bf', accent: '#ff922b' };
@@ -23,16 +23,7 @@ export const COACH_COLOR: DinoColor = { name: 'Coach', body: '#2bb59f', belly: '
 export function useOutfit(): Partial<Record<Slot, number>> {
   const shownAcc = useGame((s) => s.shownAccessories);
   const chosen = useSave((s) => s.data.outfit);
-  return useMemo(() => {
-    const out = defaultOutfit(shownAcc);
-    for (const slot of Object.keys(chosen) as Slot[]) {
-      const v = chosen[slot];
-      if (v === undefined) continue;
-      if (v === -1) out[slot] = -1;
-      else if (v < shownAcc && ACCESSORIES[v].slot === slot) out[slot] = v;
-    }
-    return out;
-  }, [shownAcc, chosen]);
+  return useMemo(() => resolveOutfit(shownAcc, chosen), [shownAcc, chosen]);
 }
 
 function BoardView({ stars, end }: { stars: number; end: number }) {

@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { cam, coach, hero, timeScale } from './game/actors';
 import { useGame, useSave } from './state/store';
-import { addDays, todayKey } from './state/progress';
+import { addDays, computeQuest, prizesEarned, todayKey } from './state/progress';
 import { endPreview, playChild, pressDry, pressWet, replayToday, showTitle, startPreview, tapCoach, tapHero, resetBoardView } from './game/director';
 import { fx } from './board/EventProps';
 import { chestPos } from './board/layout';
@@ -34,18 +34,20 @@ export function installDebug() {
     recordRun(n: number, endOffset = 0) {
       for (let i = n - 1; i >= 0; i--) useSave.getState().record(addDays(todayKey(), endOffset - i), 'dry');
     },
-    /** Jump the board: n dry nights ending yesterday, all already seen. */
-    seed(n: number, opts: { wetLast?: boolean; setup?: boolean; name?: string } = {}) {
+    /** Jump the board: n dry nights ending yesterday (or today, with `today`), all already seen. */
+    seed(n: number, opts: { wetLast?: boolean; setup?: boolean; name?: string; today?: boolean } = {}) {
       if (!useSave.getState().library.current) {
         useSave.getState().addChild();
         useSave.getState().setProfile({ name: opts.name ?? 'Zef' });
       }
       const s = useSave.getState();
-      for (let i = n; i >= 1; i--) s.record(addDays(todayKey(), -i), 'dry');
-      if (opts.wetLast) s.record(addDays(todayKey(), -1), 'wet');
+      const last = opts.today ? 0 : -1;
+      for (let i = n - 1; i >= 0; i--) s.record(addDays(todayKey(), last - i), 'dry');
+      if (opts.wetLast) s.record(addDays(todayKey(), last), 'wet');
       const d = useSave.getState().data;
       const quest = { stars: Object.values(d.records).filter((r) => r === 'dry').length };
-      s.markSeen({ stars: quest.stars, prizes: Math.max(0, quest.stars >= 10 ? 1 + Math.floor((quest.stars - 10) / 15) : 0), meter: opts.wetLast ? 0 : n, hugDate: opts.wetLast ? addDays(todayKey(), -1) : null, underpants: d.underpants.earned });
+      const q = computeQuest(d.records, d.rules);
+      s.markSeen({ stars: quest.stars, prizes: prizesEarned(quest.stars, d.rules), meter: q.meter, hugDate: opts.wetLast ? addDays(todayKey(), last) : null, underpants: d.underpants.earned });
       if (opts.setup !== false) s.setProfile({ setupDone: true });
     },
     /** Start the current (or first) child's morning from the title screen. */
@@ -79,6 +81,17 @@ export function installDebug() {
     },
     handScreen() {
       return api.project(fx.hand.pos.clone());
+    },
+    balloonScreen(i: number) {
+      const b = fx.balloons.items[i];
+      return b && !b.popped ? api.project(b.pos.clone().add(new THREE.Vector3(0, 0.38, 0))) : null;
+    },
+    bushScreen(i: number) {
+      const b = fx.bushes.items[i];
+      return b ? api.project(b.pos.clone().add(new THREE.Vector3(0, 0.55, 0))) : null;
+    },
+    introStarScreen() {
+      return api.project(fx.introStar.pos.clone());
     },
     chestScreen(land: number) {
       return api.project(chestPos(land).clone().add(new THREE.Vector3(0, 0.9, 0)));

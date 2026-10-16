@@ -5,7 +5,7 @@ import { useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { sharedTime } from '../three/shaders';
 import { mulberry32, randRange } from '../three/util';
-import { DEFAULT_RULES, landRange, type QuestRules } from '../state/progress';
+import { DEFAULT_RULES, landRange, scheduleKey, type QuestRules } from '../state/progress';
 import { chestPos, groundHeight, landCurve, landDepth, landZ, spacePos as spaceAt } from './layout';
 
 export interface Placement {
@@ -79,7 +79,7 @@ export function swaying<T extends THREE.MeshStandardMaterial>(mat: T, amount = 0
 const pathSamples = new Map<string, THREE.Vector3[]>();
 
 function samplesFor(land: number, rules: QuestRules): THREE.Vector3[] {
-  const key = `${land}:${rules.firstPrize}:${rules.prizeEvery}`;
+  const key = `${land}:${scheduleKey(rules)}`;
   let s = pathSamples.get(key);
   if (!s) {
     const c = landCurve(land, rules);

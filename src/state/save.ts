@@ -4,8 +4,10 @@ import {
   DEFAULT_RULES,
   GOAL_MAX,
   GOAL_MIN,
+  addDays,
   computeQuest,
   isValidDateKey,
+  sortedKeys,
   todayKey,
   type DateKey,
   type NightResult,
@@ -173,6 +175,12 @@ export function applyDerived(data: SaveData): SaveData {
   return { ...data, underpants: { ...data.underpants, earned: true, on: q.goalReachedOn } };
 }
 
+/** The first morning after the latest recorded one (null when nothing is recorded). */
+function morningAfterLatest(records: Records): DateKey | null {
+  const keys = sortedKeys(records);
+  return keys.length ? addDays(keys[keys.length - 1], 1) : null;
+}
+
 /** Normalise anything that looks like our save data. Returns null when it clearly isn't ours. */
 export function normalizeSave(raw: unknown, now: Date = new Date()): SaveData | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -196,8 +204,12 @@ export function normalizeSave(raw: unknown, now: Date = new Date()): SaveData | 
     records,
     rules: {
       goal: clampGoal(int(rulesRaw.goal, GOAL_MIN, GOAL_MAX, DEFAULT_RULES.goal)),
+      earlyPrize: DEFAULT_RULES.earlyPrize,
       firstPrize: DEFAULT_RULES.firstPrize,
       prizeEvery: DEFAULT_RULES.prizeEvery,
+      meter: rulesRaw.meter === 'streak' ? 'streak' : 'kind',
+      // an adventure from before the kinder meter gets it from its next morning on
+      kindFrom: isValidDateKey(rulesRaw.kindFrom) ? rulesRaw.kindFrom : rulesRaw.meter === undefined ? morningAfterLatest(records) : null,
     },
     prizes: cleanPrizes(r.prizes),
     prizesGiven: Array.isArray(r.prizesGiven)
@@ -305,7 +317,7 @@ export function seenFromRecords(data: SaveData): Seen {
 /** A fresh quest that keeps who the child is and how the game sounds. */
 export function newQuest(data: SaveData, now: Date = new Date()): SaveData {
   const fresh = defaultSave(now);
-  return { ...fresh, profile: { ...data.profile }, settings: data.settings, prizes: data.prizes, rules: data.rules };
+  return { ...fresh, profile: { ...data.profile }, settings: data.settings, prizes: data.prizes, rules: { ...data.rules, kindFrom: null } };
 }
 
 /**
@@ -315,7 +327,7 @@ export function newQuest(data: SaveData, now: Date = new Date()): SaveData {
  */
 export function startOver(data: SaveData, now: Date = new Date()): SaveData {
   const fresh = defaultSave(now);
-  return { ...fresh, profile: { ...fresh.profile, name: data.profile.name }, settings: data.settings, prizes: data.prizes, rules: data.rules };
+  return { ...fresh, profile: { ...fresh.profile, name: data.profile.name }, settings: data.settings, prizes: data.prizes, rules: { ...data.rules, kindFrom: null } };
 }
 
 export function exportBackup(data: SaveData, now: Date = new Date()): string {

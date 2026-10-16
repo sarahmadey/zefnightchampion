@@ -28,10 +28,28 @@ await page.getByRole('button', { name: 'Blue' }).click();
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `scripts/out/d-${tag}-04-blue.png`, timeout: 120000 });
 await page.getByRole('button', { name: /Let's go/ }).click();
-for (let i = 0; i < 8; i++) {
-  await page.waitForTimeout(3500);
-  await page.screenshot({ path: `scripts/out/d-${tag}-05-intro-${i}.png`, timeout: 120000 });
+// the intro is a tap-along: Coach Rex asks for a tap on the star, the chest,
+// the meter, then the child's own dino for a roar
+const steps = [
+  ['intro-star', () => window.__dino.introStarScreen()],
+  ['intro-chest', () => window.__dino.chestScreen(0)],
+  ['intro-meter', null],
+  ['intro-roar', () => window.__dino.heroScreen()],
+];
+for (const [i, [kind, where]] of steps.entries()) {
+  await page.waitForFunction((k) => window.__dino.game().awaiting === k, kind, { timeout: 240000 });
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: `scripts/out/d-${tag}-05-intro-${i}-${kind}.png`, timeout: 120000 });
+  if (where) {
+    const p = await page.evaluate(where);
+    await page.mouse.click(p.x, p.y);
+  } else {
+    await page.locator('.meter').click({ force: true });
+  }
+  await page.waitForTimeout(1800);
+  await page.screenshot({ path: `scripts/out/d-${tag}-05-intro-${i}-tapped.png`, timeout: 120000 });
 }
+await page.waitForFunction(() => window.__dino.game().phase === 'ask', null, { timeout: 180000 });
 console.log('state', JSON.stringify(await page.evaluate(() => { const g = window.__dino.game(); return { phase: g.phase, scene: g.scene, cut: g.cutscene, caption: g.caption?.text }; })));
 console.log(logs.slice(0, 30).join('\n'));
 await browser.close();

@@ -25,6 +25,10 @@ export const SPOKEN_GOALS = [3, 5, 10, 15, 20];
 const meterLine = (nights: string) =>
   `Now, see this meter? Every dry night in a row fills it up. Stay dry ${nights} nights in a row, and it's all the way full! That means you're ready to wear underwear at night!`;
 
+/** The same for the kinder meter, where a not-dry night only takes one dot away. */
+const kindMeterLine = (dots: string) =>
+  `Now, see this meter? Every dry night adds a dot, and a not-dry night only takes one away. Get ${dots} dots, and it's all the way full! That means you're ready to wear underwear at night!`;
+
 export const LINES: Record<string, Line> = {
   // ---------------------------------------------------------- first time
   'intro-1': {
@@ -40,8 +44,21 @@ export const LINES: Record<string, Line> = {
     goals: { 3: meterLine('three'), 5: meterLine('five'), 10: meterLine('ten'), 15: meterLine('fifteen') },
     anyGoal: "Now, see this meter? Every dry night in a row fills it up. When it's all the way full, that means you're ready to wear underwear at night!",
   },
+  'intro-meter-kind': {
+    text: kindMeterLine('twenty'),
+    goals: { 3: kindMeterLine('three'), 5: kindMeterLine('five'), 10: kindMeterLine('ten'), 15: kindMeterLine('fifteen') },
+    anyGoal: "Now, see this meter? Every dry night adds a dot, and a not-dry night only takes one away. When it's all the way full, that means you're ready to wear underwear at night!",
+  },
   'intro-store': { text: 'And then? We fly to the Underwear Store, way up on that mountain! You get to pick out underwear for your dino, so you can both wear underwear at night!' },
   'intro-go': { text: "Ready? Let's do this!" },
+  // the tap-along parts of the intro
+  'intro-tap-star': { text: "Let's try it! Tap the star!" },
+  'intro-yes': { text: 'Yes! Just like that!' },
+  'intro-tap-chest': { text: 'Go ahead, tap the treasure chest!' },
+  'intro-chest-tease': { text: "Ooh, it's locked! You'll open it when you get there!" },
+  'intro-tap-meter': { text: 'Tap the meter and see what full looks like!' },
+  'intro-meter-full': { text: "Whoa! That's what a full meter looks like!" },
+  'intro-roar': { text: 'Tap your dino and give me your biggest roar!' },
   'pick-dino': { text: 'First, pick your dino! Which one is you?' },
   'picked-trex': { text: 'A T. rex! Rawr! Great choice!' },
   'picked-trike': { text: 'A triceratops! Three horns, triple awesome!' },
@@ -54,6 +71,12 @@ export const LINES: Record<string, Line> = {
   'greet-1': { text: 'Good morning, Zef!', nameless: 'Good morning, superstar!' },
   'greet-2': { text: 'Rise and shine, Zef!', nameless: 'Rise and shine, buddy!' },
   'greet-3': { text: 'Good morning, big guy!', nameless: 'Good morning, sunshine!' },
+  'greet-4': { text: 'Rise and roar! Good morning!' },
+  'greet-5': { text: "Good morning! I've been waiting for you!" },
+  'greet-6': { text: "Hey, hey, look who's up! Good morning!" },
+  'greet-7': { text: 'Stomp, stomp! Good morning, superstar!' },
+  'greet-8': { text: 'Good morning, my favorite dino buddy!' },
+  'greet-9': { text: 'Yawn! Oh, hey! Good morning, sleepyhead!' },
   ask: { text: 'Did you stay dry last night? Press the sun if you did, or the heart for a big hug!' },
   'ask-short': { text: 'Did you stay dry last night?' },
   already: { text: 'Hey, Zef! You already pressed the button today. See you tomorrow morning!', nameless: 'Hey, buddy! You already pressed the button today. See you tomorrow morning!' },
@@ -65,6 +88,12 @@ export const LINES: Record<string, Line> = {
   'dry-4': { text: "Dry again! You're a superstar!" },
   'dry-5': { text: 'Boom! Another dry night! Yeah, buddy!' },
   'dry-6': { text: "Yeah! You're doing amazing, Zef!", nameless: "Yeah! You're doing amazing, buddy!" },
+  'dry-7': { text: "Woo-hoo! Another dry night! You're on a roll!" },
+  'dry-8': { text: 'Look at you go! Dry again!' },
+  'dry-9': { text: 'Wow, wow, wow! You stayed dry!' },
+  'dry-10': { text: "Yes, yes, yes! That's my dino buddy!" },
+  'dry-11': { text: "Dry night! You're doing it! Way to go!" },
+  'dry-12': { text: 'Ding, ding, ding! Dry night champion!' },
   'first-star': { text: 'Your very first star! This is the start of something awesome!' },
   hop: { text: 'Hop, hop, hop!' },
 
@@ -103,6 +132,16 @@ export const LINES: Record<string, Line> = {
   roar: { text: "Let's hear your biggest dino roar! Tap your dino to roar!" },
   'roar-more': { text: 'Louder!' },
   'roar-done': { text: 'Whoa! That was the biggest roar ever!' },
+  balloons: { text: 'Whoa, balloons! Can you pop them all?' },
+  'balloons-more': { text: 'Keep popping!' },
+  'balloons-done': { text: 'Pop, pop, pop! You got them all!' },
+  fireworks: { text: "It's fireworks time! Tap the sky to make fireworks!" },
+  'fireworks-done': { text: 'Ooh! Aah! So pretty!' },
+  peekaboo: { text: "Let's play hide and seek! I'll hide, and you find me. Ready? Close your eyes!" },
+  'peekaboo-find': { text: 'Okay! Where am I? Can you find me?' },
+  'peekaboo-nope': { text: 'Nope, not there!' },
+  'peekaboo-found': { text: 'Peekaboo! You found me!' },
+  wardrobe: { text: 'Dress-up time! What do you want to wear?' },
 
   // ---------------------------------------------------------- meter
   'meter-up': { text: 'Look! Your meter is filling up!' },
@@ -145,12 +184,17 @@ export const LINES: Record<string, Line> = {
   'wet-1': { text: "Hey, that's okay, big guy. Your body's still practicing.", nameless: "Hey, that's okay, buddy. Your body's still practicing." },
   'wet-2': { text: 'Come here! Big dino hug! My arms are tiny, but my hugs are huge!' },
   'wet-3': { text: "And look! You still have all your stars! Tonight's a brand new try!" },
+  'wet-3-kind': { text: "And look! You still have all your stars, and your meter only lost one dot! Tonight's a brand new try!" },
   'wet-4': { text: "No worries, buddy. Every dino has nights like that. You're still my favorite dino!" },
+  'wet-5': { text: "Oops! That's okay. Bodies need lots of practice, and you're doing great!" },
 
   // ---------------------------------------------------------- goodbye
   'bye-1': { text: 'See you tomorrow morning, big guy!', nameless: 'See you tomorrow morning, superstar!' },
   'bye-2': { text: 'Have an awesome day, Zef! See you tomorrow!', nameless: 'Have an awesome day, buddy! See you tomorrow!' },
   'bye-3': { text: "Don't forget to go potty before bed! See you in the morning!" },
+  'bye-4': { text: 'See you tomorrow! Keep being awesome!' },
+  'bye-5': { text: 'Bye for now! Give your grown-up a big hug from me!' },
+  'bye-6': { text: 'Have a roar-some day! See you tomorrow!' },
 
   // ---------------------------------------------------------- taps
   'tap-1': { text: 'Hey there!' },

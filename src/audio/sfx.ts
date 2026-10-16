@@ -233,6 +233,23 @@ class Synth {
       case 'whoosh':
         this.noise(0.6, { vol: 0.14, type: 'bandpass', freq: 300, endFreq: 1600, q: 1.2 });
         break;
+      case 'balloon':
+        // a rubbery snap
+        this.noise(0.07, { vol: 0.32, type: 'highpass', freq: 1400 });
+        this.tone(260 + Math.random() * 80, 0.07, { vol: 0.16, glide: 70 });
+        break;
+      case 'firework':
+        // a whistle up, a soft boom, then crackles
+        this.tone(700, 0.45, { vol: 0.05, glide: 1500 });
+        this.noise(0.55, { vol: 0.24, type: 'lowpass', freq: 420, delay: 0.45 });
+        for (let i = 0; i < 6; i++) this.noise(0.04, { vol: 0.07, type: 'highpass', freq: 3000, delay: 0.62 + i * 0.07 + Math.random() * 0.04 });
+        break;
+      case 'rustle':
+        this.noise(0.4, { vol: 0.1, type: 'bandpass', freq: 2600, endFreq: 1600, q: 0.8 });
+        break;
+      case 'poof':
+        this.noise(0.35, { vol: 0.16, type: 'bandpass', freq: 700, endFreq: 220, q: 0.9 });
+        break;
       case 'fanfare': {
         const seq = [0, 2, 4, 5];
         seq.forEach((n, i) => this.tone(penta(n + 5) / 2, 0.22, { vol: 0.14, type: 'triangle', delay: i * 0.12 }));
@@ -316,6 +333,10 @@ export type SoundName =
   | 'drumroll'
   | 'ding'
   | 'drop'
-  | 'flap';
+  | 'flap'
+  | 'balloon'
+  | 'firework'
+  | 'rustle'
+  | 'poof';
 
 export const sfx = new Synth();

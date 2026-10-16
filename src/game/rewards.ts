@@ -38,9 +38,10 @@ export const ACCESSORIES: Accessory[] = [
   { id: 'goggles', name: 'swim goggles', slot: 'face' },
 ];
 
-export type Surprise = 'egg' | 'highfive' | 'dance' | 'roar';
+export type Surprise = 'egg' | 'highfive' | 'dance' | 'roar' | 'balloons' | 'fireworks' | 'peekaboo';
 
-const AFTER_EGGS: Surprise[] = ['highfive', 'dance', 'roar'];
+/** Between eggs (and after them all), the other surprises take turns. */
+const AFTER_EGGS: Surprise[] = ['highfive', 'balloons', 'dance', 'peekaboo', 'roar', 'fireworks'];
 
 /** The surprise that star number `star` (1-based) brings. */
 export function surpriseFor(star: number): Surprise {
@@ -48,7 +49,8 @@ export function surpriseFor(star: number): Surprise {
   const eggStars = ACCESSORIES.length * 2;
   if (star <= eggStars && star % 2 === 1) return 'egg';
   const k = star <= eggStars ? star / 2 - 1 : star - eggStars - 1;
-  return AFTER_EGGS[((k % 3) + 3) % 3];
+  const n = AFTER_EGGS.length;
+  return AFTER_EGGS[((k % n) + n) % n];
 }
 
 /** The accessory hatched by star `star`, or null if that star isn't an egg. */
@@ -59,6 +61,21 @@ export function accessoryForStar(star: number): number | null {
 /** How many accessories `stars` stars have unlocked. */
 export function accessoriesUnlocked(stars: number): number {
   return Math.min(ACCESSORIES.length, Math.ceil(Math.max(0, stars) / 2));
+}
+
+/**
+ * What the dino wears: the newest accessory per slot among those unlocked,
+ * unless the child picked something else in the wardrobe (-1 = nothing there).
+ */
+export function resolveOutfit(unlocked: number, chosen: Partial<Record<Slot, number>>): Partial<Record<Slot, number>> {
+  const out = defaultOutfit(unlocked);
+  for (const slot of Object.keys(chosen) as Slot[]) {
+    const v = chosen[slot];
+    if (v === undefined) continue;
+    if (v === -1) out[slot] = -1;
+    else if (v < unlocked && ACCESSORIES[v].slot === slot) out[slot] = v;
+  }
+  return out;
 }
 
 /** The newest accessory in each slot among those unlocked: what the dino wears by default. */

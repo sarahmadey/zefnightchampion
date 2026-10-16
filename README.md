@@ -34,18 +34,26 @@ up (the same explanation is in the parent corner).
    - **Dry!** A big star flies onto the next stepping stone, Zef's dino
      hops onto it, the underwear meter ticks up, and one surprise plays.
      The surprises rotate:
-     - a mystery egg: Zef taps it open, the prize floats out big and
-       spinning, and a big "Collect!" button puts it on his dino (caps,
-       sunglasses, a basketball jersey, a soccer ball, sneakers, a cape and
-       more)
-     - a high five with Coach Rex
-     - a dance party
-     - a roar-off
+     - a mystery egg (every other star, until he has them all): Zef taps
+       it open, the prize floats out big and spinning, and a big
+       "Collect!" button puts it on his dino (caps, sunglasses, a
+       basketball jersey, a soccer ball, sneakers, a cape and more)
+     - in between, in turn: a high five with Coach Rex, balloons to pop, a
+       dance party, hide and seek (Coach Rex hides behind one of three
+       bushes, and the one that wiggles is the giveaway), a roar-off, and
+       fireworks Zef taps into the sky
    - **Not dry.** Coach Rex walks over for a big hug ("My arms are tiny,
-     but my hugs are huge!"). The underwear meter starts fresh. Every star
-     stays.
-3. **See you tomorrow!** A replay button lets Zef watch it again. One press
-   counts per morning, and refreshing never replays or double-counts.
+     but my hugs are huge!"). The underwear meter loses one dot, and every
+     star stays.
+3. **See you tomorrow!** A replay button lets Zef watch it again, and a
+   hanger button opens his dino's wardrobe: everything he's collected,
+   to put on or take off himself, with Coach Rex reacting to each one. What
+   he picks is what his dino wears on the board and the title screen. One
+   press counts per morning, and refreshing never replays or double-counts.
+
+Coach Rex has nine ways to say good morning, a dozen cheers for a dry night
+and six goodbyes, and they rotate, so the mornings don't sound the same for
+weeks.
 
 Coach Rex's words show as a caption along the bottom, just above whatever
 buttons are showing.
@@ -56,19 +64,27 @@ buttons are showing.
   away. The board winds through seven lands: Jungle Jumble, Volcano Valley,
   Splashy Lagoon, Fossil Canyon, Snowball Mountain, Crystal Caves and
   Rainbow Meadow. Each land ends at a treasure chest with a real-world
-  prize. The first chest is at 10 stars, then one every 15 stars (25, 40,
-  55, ...). The default prizes are candy, movie night, McDonald's, a
+  prize. The first chest is just 5 stars away, the next at 10, then one
+  every 15 stars (25, 40, 55, ...). A child who was already past 5 stars
+  when the early chest arrived gets that extra chest on their next
+  morning. The default prizes are candy, movie night, McDonald's, a
   squishy, candy, and a pizza party, then the list starts over. All of
   them can be edited.
-- **The underwear meter.** This counts dry nights in a row and has
-  underwear at the top. When it's full (20 nights in a row by default; a
+- **The underwear meter.** This has underwear at the top. Every dry night
+  adds a dot, and a not-dry night takes only one away (never below empty),
+  so a few accidents never undo weeks of work; the meter fills once dry
+  nights clearly outnumber the rest. When it's full (20 dots by default; a
   grown-up can change the goal), Zef is ready to wear underwear at night. A
   pterodactyl flies him to the Underwear Store, where he picks out
   underwear for his dino, so they both wear underwear at night. Coach Rex
-  only says "twenty nights" when the goal is 20.
+  says the goal's number when it's 3, 5, 10, 15 or 20. A grown-up can
+  switch to the classic meter instead, which counts dry nights in a row and
+  starts over after a not-dry night. An adventure that began before the
+  kinder meter existed gets it from its next morning on (the nights before
+  stay as they were counted), so its meter never jumps.
 
 A morning with no record is unknown. It never counts as dry or not dry: it
-doesn't add a star and doesn't reset the meter.
+doesn't add a star and doesn't change the meter.
 
 ## A new child
 
@@ -77,15 +93,18 @@ doesn't add a star and doesn't reset the meter.
    instead of diapers) and how a morning, the stars, the hug, the prize
    chests and the meter work.
 1. A grown-up enters the child's name and picks the goal: how many dry
-   nights in a row fill the meter (3, 5, 10, 15 or 20; any other number
-   later in the parent corner). Coach Rex says that number in his intro.
+   nights fill the meter (3, 5, 10, 15 or 20; any other number later in
+   the parent corner). Coach Rex says that number in his intro.
 2. The child picks their dino (T. rex, triceratops, stegosaurus or
    long-neck) and its color.
-3. Coach Rex explains the mission: stay dry at night so you can wear
-   underwear to bed instead of diapers; a star for every dry morning and
-   treasure chests with prizes along the way; a hug for a not-dry night; the
-   meter that fills with dry nights in a row; and the Underwear Store at
-   the end.
+3. Coach Rex explains the mission, and the child taps along: stay dry at
+   night so you can wear underwear to bed instead of diapers; a star for
+   every dry morning (tap the star, and the dino hops onto it); treasure
+   chests with prizes along the way (tap one: it's locked until you get
+   there); a hug for a not-dry night; the meter (tap it to see what full
+   looks like); and the Underwear Store at the end. It finishes with the
+   child tapping their dino for their biggest roar. If a tap doesn't come,
+   Coach Rex carries on by himself.
 
 The game itself always uses its bright daytime colors; only the parent
 corner follows the phone's dark mode.
@@ -100,9 +119,12 @@ multiplication question. In the parent corner you can:
   weeks
 - set the underwear goal; it shows how long the goal typically takes at
   the recent dry rate
+- choose what a not-dry night does to the meter: take one dot off (the
+  kinder default) or start it over (the classic way: dry nights in a row)
 - edit the prizes and tick off the ones you've handed over
-- preview a dry morning, the hug, a prize chest, the Underwear Store or the
-  intro, without changing real progress
+- preview a dry morning, the hug, a prize chest, a surprise (a different
+  one each tap), the Underwear Store or the intro, without changing real
+  progress
 - change the name, dino and color, and turn sound, music and reduced motion
   on or off
 - back up and restore (old candy-castle backups bring their nights along)
@@ -153,7 +175,8 @@ Lines that say "Zef" have name-free twins ("buddy") used if the name is
 changed (or call him "big guy": other children are "superstar" or
 "buddy"). The intro line about the meter is recorded for goals of 3, 5, 10,
 15 and 20 nights, the quick picks on the new-child screen, with a twin
-without the number for any other goal. Clips for lines that no longer exist are removed.
+without the number for any other goal, in a version for each kind of
+meter. Clips for lines that no longer exist are removed.
 
 To use a different voice, replace the clips with files of the same names.
 
@@ -178,8 +201,9 @@ npm run build:single # one self-contained HTML file in dist-single/
 `?debug` in the URL exposes a small test API on `window.__dino`. With it
 you can seed nights, press the buttons, run previews, and project dinos and
 props to screen positions. The `scripts/dino-*.mjs` files use it with
-Playwright to play through the title screen, setup, mornings, chests, the
-store and the parent corner. `scripts/dino-sync.mjs` stands in for the
+Playwright to play through the title screen, setup and the tap-along
+intro, mornings, chests, the surprises, the wardrobe, the store and the
+parent corner. `scripts/dino-sync.mjs` stands in for the
 viewer's database to check that two family devices stay in step and that a
 Viewer's adventures stay separate.
 

@@ -10,7 +10,7 @@ import { Dino } from '../dino/Dino';
 import { cam, frameDt, makeActor, play, type DinoAction, type DinoActor } from '../game/actors';
 import { childList, useGame, useSave } from '../state/store';
 import { computeQuest } from '../state/progress';
-import { ACCESSORIES, DINO_COLORS, SPECIES, accessoriesUnlocked, defaultOutfit, type DinoColor, type Slot, type Species } from '../game/rewards';
+import { DINO_COLORS, SPECIES, accessoriesUnlocked, resolveOutfit, type DinoColor, type Slot, type Species } from '../game/rewards';
 import { COACH_COLOR } from '../board/Board';
 import { playChild } from '../game/director';
 import { sfx } from '../audio/sfx';
@@ -34,15 +34,7 @@ interface CastMember {
 /** What a child's dino wears: what they've collected, as they last chose it. */
 function outfitOf(d: SaveData): Partial<Record<Slot, number>> {
   const q = computeQuest(d.records, d.rules);
-  const unlocked = accessoriesUnlocked(Math.min(d.seen.stars, q.stars));
-  const out = defaultOutfit(unlocked);
-  for (const slot of Object.keys(d.outfit) as Slot[]) {
-    const v = d.outfit[slot];
-    if (v === undefined) continue;
-    if (v === -1) out[slot] = -1;
-    else if (v < unlocked && ACCESSORIES[v].slot === slot) out[slot] = v;
-  }
-  return out;
+  return resolveOutfit(accessoriesUnlocked(Math.min(d.seen.stars, q.stars)), d.outfit);
 }
 
 /** Where each of n dinos stands, with Coach Rex behind the middle. */

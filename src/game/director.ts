@@ -22,17 +22,17 @@ import { music } from '../audio/music';
 import { unlockAudio, voiceLevel } from '../audio/core';
 import { burst } from '../three/Particles';
 import { useGame, useSave, type PreviewKind } from '../state/store';
-import { computeQuest, landOf, landRange, todayKey, type QuestState } from '../state/progress';
-import { ACCESSORIES, accessoriesUnlocked, accessoryForStar, prizeAt, surpriseFor, type Prize, type Species } from './rewards';
-import { chestPos, landCurve, restPos, spacePos, storeLandmarkPos } from '../board/layout';
+import { computeQuest, landOf, landRange, prizesEarned, todayKey, type DateKey, type QuestState } from '../state/progress';
+import { ACCESSORIES, accessoriesUnlocked, accessoryForStar, prizeAt, resolveOutfit, surpriseFor, type Prize, type Species } from './rewards';
+import { chestPos, groundHeight, landCurve, restPos, spacePos, storeLandmarkPos } from '../board/layout';
 import { chestAnim, onChestTap } from '../board/Chest';
-import { flyStar, fx, onEggTap, onHandTap, onPrizeTap } from '../board/EventProps';
+import { MAX_BALLOONS, flyStar, fx, launchFirework, onBalloonTap, onBushTap, onEggTap, onHandTap, onIntroStarTap, onPrizeTap, onSkyTap } from '../board/EventProps';
 import { pedestalHeight, pedestalPos, STORE_ORIGIN } from '../store/StoreScene';
 import { lineup } from '../setup/SetupStage';
 import { voice } from '../voice/voice';
 import { lineText } from '../voice/lines';
 import { boardView } from './CameraRig';
-import { clamp, ease } from '../three/util';
+import { clamp, ease, TAU } from '../three/util';
 
 interface Ctx {
   wait: (s: number) => Promise<void>;
@@ -47,14 +47,14 @@ export function cancelCutscene() {
   if (current) current.cancelled = true;
   current = null;
   voice.stop();
-  useGame.getState().set({ cutscene: null, caption: null, awaiting: null });
+  useGame.getState().set({ cutscene: null, caption: null, awaiting: null, dressUp: false });
 }
 
 async function runCutscene(name: string, fn: (ctx: Ctx) => Promise<void>) {
   if (current) current.cancelled = true;
   const me = { id: ++seq, cancelled: false };
   current = me;
-  useGame.getState().set({ cutscene: name });
+  useGame.getState().set({ cutscene: name, dressUp: false });
   const ctx: Ctx = {
     wait: async (s) => {
       await clock.wait(s);
@@ -95,6 +95,21 @@ function childName() {
 
 function goal() {
   return data().rules.goal;
+}
+
+/** Today as a day count, so lines that rotate daily change every morning. */
+function dayIndex(): number {
+  const d = new Date();
+  return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000);
+}
+
+const GREETINGS = ['greet-1', 'greet-2', 'greet-3', 'greet-4', 'greet-5', 'greet-6', 'greet-7', 'greet-8', 'greet-9'];
+const DRY_CHEERS = ['dry-1', 'dry-2', 'dry-3', 'dry-4', 'dry-5', 'dry-6', 'dry-7', 'dry-8', 'dry-9', 'dry-10', 'dry-11', 'dry-12'];
+const GOODBYES = ['bye-1', 'bye-2', 'bye-3', 'bye-4', 'bye-5', 'bye-6'];
+
+/** The dry-night cheer for star `n` (they take turns, so they don't repeat for 12 mornings). */
+function dryCheer(n: number): string {
+  return DRY_CHEERS[Math.max(0, n - 1) % DRY_CHEERS.length];
 }
 
 function prefetch(ids: string[]) {
@@ -299,9 +314,25 @@ function clearProps() {
   Object.assign(chestAnim, { land: -1, open: 0, rise: 0, wiggle: 0 });
   fx.egg.visible = false;
   fx.prize.visible = false;
+  fx.balloons.active = false;
+  fx.bushes.active = false;
+  fx.rockets.length = 0;
+  onBalloonTap(null);
+  onBushTap(null);
+  onSkyTap(null);
+  fx.introStar.visible = false;
+  onIntroStarTap(null);
+  meterTap = null;
+  introRoarTap = null;
   fx.hand.visible = false;
   fx.ptero.visible = false;
   fx.star.active = false;
+  // and what a moment cut short leaves on the dinos: a look at the sky, a squash, a jump
+  for (const a of [hero, coach]) {
+    a.look = null;
+    a.stretch = 1;
+    a.air = 0;
+  }
 }
 
 /** The game always opens on the title screen. */
@@ -320,7 +351,7 @@ export function showTitle() {
   for (const [id, c] of Object.entries(save.library.children)) {
     if (!c.data.profile.name.trim() && !c.data.profile.setupDone && Object.keys(c.data.records).length === 0) save.removeChild(id);
   }
-  useGame.getState().set({ phase: 'title', scene: 'title', setupStep: null, setupBack: false, preview: null, parentOpen: false, fade: 0, highlight: null, previewUnderpants: null });
+  useGame.getState().set({ phase: 'title', scene: 'title', setupStep: null, setupBack: false, preview: null, parentOpen: false, fade: 0, highlight: null, previewUnderpants: null, dressUp: false });
   titleCamera();
 }
 
@@ -378,7 +409,7 @@ export function setupBack() {
 function beginSetup(canGoBack: boolean, welcome = false) {
   useGame
     .getState()
-    .set({ phase: 'setup', scene: 'setup', setupStep: welcome ? 'welcome' : 'name', setupBack: canGoBack, preview: null, parentOpen: false, fade: 0, highlight: null, howItWorks: false });
+    .set({ phase: 'setup', scene: 'setup', setupStep: welcome ? 'welcome' : 'name', setupBack: canGoBack, preview: null, parentOpen: false, fade: 0, highlight: null, howItWorks: false, dressUp: false });
   setupCamera();
 }
 
@@ -398,10 +429,9 @@ function startMorning(fromTitle = false) {
     play(hero, 'stretch', 1.8);
     play(coach, 'wave', 1.6);
     closeShot(2);
-    const greets = ['greet-1', 'greet-2', 'greet-3'];
-    const day = new Date().getDate();
-    prefetch(['ask', 'already', ...greets]);
-    await say(ctx, greets[day % 3]);
+    const greeting = GREETINGS[dayIndex() % GREETINGS.length];
+    prefetch(['ask', 'already', greeting]);
+    await say(ctx, greeting);
     if (hasPending()) {
       await playPending(ctx);
       return;
@@ -469,9 +499,13 @@ export function checkProgress() {
   if (!hasPending()) {
     const has = !!data().records[today()];
     if (g.phase === 'ask' && has) g.set({ phase: 'done' });
-    if (g.phase === 'done' && !has) g.set({ phase: 'ask' });
+    if (g.phase === 'done' && !has) {
+      putAwayWardrobe();
+      g.set({ phase: 'ask' });
+    }
     return;
   }
+  putAwayWardrobe();
   g.set({ phase: 'event' });
   void runCutscene('pending', (ctx) => playPending(ctx));
 }
@@ -504,14 +538,26 @@ async function playPending(ctx: Ctx) {
   const q = computeQuest(d.records, d.rules);
   const g = useGame.getState();
   const latestDry = q.latest?.result === 'dry';
-  prefetch(['dry-1', 'dry-2', 'dry-3', 'dry-4', 'dry-5', 'dry-6', 'wet-1', 'wet-2', 'wet-3', 'bye-1', 'bye-2', 'bye-3']);
+  prefetch([dryCheer(q.stars), 'first-star', 'wet-1', 'wet-4', 'wet-5', 'wet-2', 'wet-3', 'wet-3-kind', GOODBYES[dayIndex() % GOODBYES.length]]);
 
-  // 1. new stars
+  // 1. a chest the child is already past but hasn't opened (the prize schedule
+  //    gained one): open the one just behind them, and settle older ones quietly
+  const passed = Math.min(q.prizes, prizesEarned(g.shownStars, d.rules));
+  for (let land = d.seen.prizes; land < passed; land++) {
+    if (land >= landOf(g.shownStars, d.rules) - 1) {
+      await openChest(ctx, land, false);
+    } else {
+      useSave.getState().markSeen({ prizes: land + 1 });
+      useGame.getState().set({ openedChests: Math.max(useGame.getState().openedChests, land + 1) });
+    }
+  }
+
+  // 1b. new stars
   if (q.stars > g.shownStars) {
     await celebrateStars(ctx, g.shownStars, q.stars, latestDry);
   }
 
-  // 2. the meter catches up (dry) — a wet night's fresh start happens in the hug
+  // 2. the meter catches up (dry) — a wet night's dot comes off during the hug
   const after = quest();
   if (latestDry && after.meter !== useGame.getState().shownMeter) {
     await meterUp(ctx, useGame.getState().shownMeter, after.meter, data().rules.goal);
@@ -549,8 +595,7 @@ async function celebrateStars(ctx: Ctx, from: number, to: number, cheer: boolean
     hero.expression = 'happy';
     sfx.play('fanfare');
     burst('confetti', hero.pos.clone().setY(hero.pos.y + 1.4), { count: 40 });
-    const lines = ['dry-1', 'dry-2', 'dry-3', 'dry-4', 'dry-5', 'dry-6'];
-    await say(ctx, to === 1 ? 'first-star' : lines[(to - 1) % lines.length], 0.1);
+    await say(ctx, to === 1 ? 'first-star' : dryCheer(to), 0.1);
   }
   for (let s = from + 1; s <= to; s++) {
     const quick = s < to;
@@ -683,15 +728,235 @@ async function crossBridge(ctx: Ctx, land: number) {
 
 // ------------------------------------------------------------ surprises
 
-async function surprise(ctx: Ctx, star: number, preview: boolean) {
-  const kind = surpriseFor(star);
+async function surprise(ctx: Ctx, star: number, preview: boolean, kind = surpriseFor(star)) {
   closeShot(2.2);
   faceCamera(hero);
   faceCamera(coach);
   if (kind === 'egg') await eggSurprise(ctx, star, preview);
   else if (kind === 'highfive') await highFive(ctx);
   else if (kind === 'dance') await danceParty(ctx);
+  else if (kind === 'balloons') await balloonPop(ctx);
+  else if (kind === 'fireworks') await fireworksShow(ctx);
+  else if (kind === 'peekaboo') await hideAndSeek(ctx);
   else await roarOff(ctx);
+}
+
+/** The flat direction from Zef's dino toward the camera, and the one to its right. */
+function viewAxes(): { toCam: THREE.Vector3; side: THREE.Vector3 } {
+  const toCam = new THREE.Vector3().subVectors(cameraPos(), hero.pos).setY(0).normalize();
+  return { toCam, side: new THREE.Vector3(-toCam.z, 0, toCam.x) };
+}
+
+/** Balloons float up in front of the dinos: pop them all. */
+async function balloonPop(ctx: Ctx) {
+  const { toCam, side } = viewAxes();
+  const mid = hero.pos.clone().lerp(coach.pos, 0.45).addScaledVector(toCam, 1.3);
+  const n = Math.min(5, MAX_BALLOONS);
+  const base = Math.max(hero.pos.y, coach.pos.y);
+  const targets = Array.from({ length: n }, (_, i) =>
+    mid
+      .clone()
+      .addScaledVector(side, (i - (n - 1) / 2) * 0.85)
+      .setY(base + 1.0 + (i % 2) * 0.55 + Math.random() * 0.2),
+  );
+  fx.balloons.items = targets.map((t) => ({ pos: t.clone().setY(t.y - 1.4), popped: false, pop: 0 }));
+  fx.balloons.active = true;
+  sfx.play('magic');
+  let start = clock.time;
+  for (;;) {
+    await ctx.wait(0);
+    const u = clamp((clock.time - start) / 0.9, 0, 1);
+    fx.balloons.items.forEach((b, i) => b.pos.copy(targets[i]).setY(targets[i].y - 1.4 * (1 - ease.outCubic(u))));
+    if (u >= 1) break;
+  }
+  let popped = 0;
+  const pop = (i: number) => {
+    const b = fx.balloons.items[i];
+    if (!b || b.popped) return;
+    b.popped = true;
+    popped++;
+    sfx.play('balloon');
+    burst('confetti', b.pos.clone().setY(b.pos.y + 0.4), { count: 20, speed: 3 });
+    play(hero, popped % 2 ? 'giggle' : 'cheer', 0.8);
+  };
+  onBalloonTap(pop);
+  useGame.getState().set({ awaiting: 'balloons' });
+  sayAsync('balloons');
+  start = clock.time;
+  let nudged = false;
+  let lastAuto = 0;
+  try {
+    await ctx.until(() => {
+      if (!nudged && clock.time - start > 9 && popped < n) {
+        nudged = true;
+        sayAsync('balloons-more');
+      }
+      // nobody popping? they pop by themselves after a while
+      if (clock.time - start > 18 && clock.time - lastAuto > 0.5) {
+        lastAuto = clock.time;
+        const i = fx.balloons.items.findIndex((b) => !b.popped);
+        if (i >= 0) pop(i);
+      }
+      return popped >= n;
+    }, 40);
+  } finally {
+    onBalloonTap(null);
+    useGame.getState().set({ awaiting: null });
+  }
+  await ctx.wait(0.4);
+  fx.balloons.active = false;
+  play(hero, 'cheer', 1.4);
+  play(coach, 'cheer', 1.4);
+  hero.expression = 'happy';
+  await say(ctx, 'balloons-done');
+  hero.expression = 'smile';
+}
+
+/** Fireworks: every tap on the sky sends one up. */
+async function fireworksShow(ctx: Ctx) {
+  const { toCam, side } = viewAxes();
+  const mid = hero.pos.clone().lerp(coach.pos, 0.5);
+  const sky = mid.clone().addScaledVector(toCam, -5).setY(mid.y + 6);
+  // look up over the dinos' shoulders into the sky
+  shot(mid.clone().addScaledVector(toCam, 6.5).setY(mid.y + 1.4), sky, 1.6, 0);
+  hero.look = sky.clone();
+  coach.look = sky.clone();
+  const randomSky = () => sky.clone().addScaledVector(side, (Math.random() - 0.5) * 9).add(new THREE.Vector3(0, Math.random() * 2.5 - 0.5, 0));
+  let shots = 0;
+  onSkyTap((p) => {
+    shots++;
+    // keep it up in the sky, even for a tap near the ground
+    const q = p.clone();
+    q.y = Math.max(q.y, mid.y + 4.5);
+    launchFirework(q);
+    if (shots % 2) play(hero, 'cheer', 0.9);
+  });
+  useGame.getState().set({ awaiting: 'fireworks' });
+  sayAsync('fireworks');
+  const start = clock.time;
+  let lastAuto = 0;
+  try {
+    await ctx.until(() => {
+      if (clock.time - start > 8 && clock.time - lastAuto > 1.4 && shots < 6) {
+        lastAuto = clock.time;
+        shots++;
+        launchFirework(randomSky());
+      }
+      return shots >= 6;
+    }, 40);
+  } finally {
+    onSkyTap(null);
+    useGame.getState().set({ awaiting: null });
+  }
+  await ctx.wait(1.5);
+  hero.look = null;
+  coach.look = null;
+  closeShot(2);
+  play(hero, 'cheer', 1.4);
+  play(coach, 'cheer', 1.4);
+  await say(ctx, 'fireworks-done');
+}
+
+/** Hide and seek: Coach Rex hides behind one of three bushes. */
+async function hideAndSeek(ctx: Ctx) {
+  play(coach, 'wave', 1.4);
+  await say(ctx, 'peekaboo', 0.2);
+  const { toCam, side } = viewAxes();
+  const mid = hero.pos.clone().lerp(coach.pos, 0.5);
+  const home = coach.pos.clone();
+  // poof! he's gone
+  sfx.play('poof');
+  burst('puff', coach.pos.clone().setY(coach.pos.y + 1.4), { count: 16, size: 0.5, speed: 1.2 });
+  coach.visible = false;
+  // three bushes pop up in a row in front of the dinos
+  fx.bushes.items = [-1, 0, 1].map((k) => {
+    const pos = mid.clone().addScaledVector(toCam, 2.1).addScaledVector(side, k * 1.55);
+    pos.y = groundHeight(pos.x, pos.z);
+    return { pos, wiggle: 0, scale: 0.01, heading: Math.random() * TAU };
+  });
+  fx.bushes.active = true;
+  const hiding = Math.floor(Math.random() * 3);
+  sfx.play('rustle');
+  let start = clock.time;
+  for (;;) {
+    await ctx.wait(0);
+    const u = clamp((clock.time - start) / 0.5, 0, 1);
+    for (const b of fx.bushes.items) b.scale = 0.01 + 1.05 * ease.outBack(u);
+    if (u >= 1) break;
+  }
+  // on a tall screen the meter covers the right edge: slide the bushes left of it
+  const tall = typeof window !== 'undefined' && window.innerWidth < window.innerHeight * 0.8;
+  // (`side` points to the screen's left, so the camera moves the other way)
+  const center = mid.clone().addScaledVector(toCam, 2.1).addScaledVector(side, tall ? -0.45 : 0);
+  shot(center.clone().addScaledVector(toCam, 5.4).setY(center.y + 2.8), center.clone().addScaledVector(toCam, -0.6).setY(center.y + 0.6), 2.2, tall ? 6 : 5.6);
+  await say(ctx, 'peekaboo-find', 0);
+  let found = false;
+  let lastNope = -9;
+  onBushTap((i) => {
+    if (found) return;
+    fx.bushes.items[i].wiggle = 1;
+    sfx.play('rustle');
+    if (i === hiding) {
+      found = true;
+      return;
+    }
+    if (clock.time - lastNope > 1.6) {
+      lastNope = clock.time;
+      sayAsync('peekaboo-nope');
+    }
+  });
+  useGame.getState().set({ awaiting: 'peekaboo' });
+  const t0 = clock.time;
+  let lastHint = t0;
+  try {
+    await ctx.until(() => {
+      // the bush he's behind gives a little wiggle now and then
+      if (clock.time - lastHint > 2.6) {
+        lastHint = clock.time;
+        fx.bushes.items[hiding].wiggle = 0.7;
+        sfx.play('rustle');
+      }
+      if (clock.time - t0 > 20) found = true;
+      return found;
+    }, 40);
+  } finally {
+    onBushTap(null);
+    useGame.getState().set({ awaiting: null });
+  }
+  // peekaboo! he pops up from behind it
+  const bush = fx.bushes.items[hiding];
+  coach.pos.copy(bush.pos).addScaledVector(toCam, -0.75);
+  coach.pos.y = groundHeight(coach.pos.x, coach.pos.z) + 0.04;
+  coach.visible = true;
+  faceCamera(coach);
+  sfx.play('boing');
+  burst('sparkle', coach.pos.clone().setY(coach.pos.y + 1.8), { count: 30, speed: 3 });
+  burst('confetti', coach.pos.clone().setY(coach.pos.y + 1.8), { count: 30 });
+  play(coach, 'cheer', 1.6);
+  start = clock.time;
+  for (;;) {
+    await ctx.wait(0);
+    const u = clamp((clock.time - start) / 0.55, 0, 1);
+    coach.air = Math.sin(u * Math.PI) * 1.1;
+    if (u >= 1) break;
+  }
+  coach.air = 0;
+  hero.expression = 'happy';
+  play(hero, 'giggle', 1.2);
+  await say(ctx, 'peekaboo-found', 0.2);
+  // the bushes shrink away and Coach Rex strolls back
+  start = clock.time;
+  for (;;) {
+    await ctx.wait(0);
+    const u = clamp((clock.time - start) / 0.4, 0, 1);
+    for (const b of fx.bushes.items) b.scale = Math.max(0.001, 1.05 * (1 - u));
+    if (u >= 1) break;
+  }
+  fx.bushes.active = false;
+  closeShot(2);
+  await walkTo(ctx, coach, home, 2.6);
+  faceCamera(coach);
+  hero.expression = 'smile';
 }
 
 async function eggSurprise(ctx: Ctx, star: number, preview: boolean) {
@@ -817,6 +1082,7 @@ async function eggSurprise(ctx: Ctx, star: number, preview: boolean) {
   }
   prize.visible = false;
   fx.egg.visible = false;
+  if (!preview) useSave.getState().setOutfit(ACCESSORIES[acc].slot, acc);
   useGame.getState().set({ shownAccessories: acc + 1 });
   sfx.play('sparkle');
   burst('sparkle', hero.slots[slot].clone(), { count: 40, speed: 3 });
@@ -834,6 +1100,62 @@ async function eggSurprise(ctx: Ctx, star: number, preview: boolean) {
 }
 
 let collectTap: (() => void) | null = null;
+
+// ------------------------------------------------------------ wardrobe
+
+/** What Zef's dino is wearing right now. */
+function currentOutfit() {
+  return resolveOutfit(useGame.getState().shownAccessories, data().outfit);
+}
+
+/** The hanger button after the morning: dress-up time, with a close-up of the dino. */
+export function openWardrobe() {
+  const g = useGame.getState();
+  if (g.phase !== 'done' || g.cutscene || g.dressUp || g.shownAccessories < 1) return;
+  unlockAudio();
+  g.set({ dressUp: true });
+  sfx.play('magic');
+  faceCamera(hero);
+  const { toCam } = viewAxes();
+  // the dino sits in the top half, above the wardrobe
+  shot(hero.pos.clone().addScaledVector(toCam, 3.4).setY(hero.pos.y + 1.2), hero.pos.clone().setY(hero.pos.y + 0.25), 2.4, 2.6);
+  play(hero, 'show', 1.6);
+  sayAsync('wardrobe');
+}
+
+/** Tap an item in the wardrobe: put it on (Coach Rex names it), or take it off. */
+export function toggleOutfit(index: number) {
+  const g = useGame.getState();
+  if (!g.dressUp || g.phase !== 'done' || g.scene !== 'board' || g.preview || index < 0 || index >= g.shownAccessories) return;
+  const a = ACCESSORIES[index];
+  const worn = currentOutfit()[a.slot] === index;
+  useSave.getState().setOutfit(a.slot, worn ? -1 : index);
+  if (worn) {
+    sfx.play('pop');
+    play(hero, 'giggle', 0.8);
+    return;
+  }
+  sfx.play('magic');
+  burst('sparkle', hero.slots[a.slot].clone(), { count: 24, speed: 2.5 });
+  play(hero, 'show', 1.4);
+  sayAsync(`acc-${a.id}`);
+}
+
+export function closeWardrobe() {
+  if (!useGame.getState().dressUp) return;
+  sfx.play('tap');
+  putAwayWardrobe();
+}
+
+/** Close the wardrobe without a sound (when something else needs the screen). */
+function putAwayWardrobe() {
+  const g = useGame.getState();
+  if (!g.dressUp) return;
+  g.set({ dressUp: false });
+  if (g.scene !== 'board') return;
+  boardCamera(1.6);
+  faceCamera(hero);
+}
 
 /** The big "Collect!" button under the prize from the egg. */
 export function collectPrize() {
@@ -963,6 +1285,10 @@ function heroRoar() {
 
 export function tapHero() {
   const g = useGame.getState();
+  if (g.awaiting === 'intro-roar') {
+    introRoarTap?.();
+    return;
+  }
   if (g.awaiting === 'roar' && roaring) {
     heroRoar();
     return;
@@ -998,12 +1324,21 @@ export function tapCoach() {
 
 // ------------------------------------------------------------ hug
 
-async function hug(ctx: Ctx, preview: boolean) {
+/** The meter as it stood before the morning of `date` was recorded. */
+function meterBefore(date: DateKey): number {
+  const d = data();
+  const records = { ...d.records };
+  delete records[date];
+  return computeQuest(records, d.rules).meter;
+}
+
+async function hug(ctx: Ctx, preview: boolean, replay = false) {
   music.setMood('calm');
   hero.expression = 'calm';
   faceCamera(hero);
   closeShot(1.8);
-  await say(ctx, 'wet-1', 0.1);
+  const openers = ['wet-1', 'wet-4', 'wet-5'];
+  await say(ctx, openers[quest().wets % openers.length], 0.1);
   // Coach walks over beside Zef (side-on to the camera) and wraps him up
   const view = new THREE.Vector3().subVectors(hero.pos, cameraPos()).setY(0).normalize();
   const right = new THREE.Vector3(-view.z, 0, view.x);
@@ -1021,17 +1356,22 @@ async function hug(ctx: Ctx, preview: boolean) {
   const hearts = setInterval(() => burst('heart', mid.clone().setY(mid.y + 1.6), { count: 3 }), 600);
   try {
     await say(ctx, 'wet-2', 0.3);
-    // the meter starts fresh; the stars all stay
+    // the kinder meter loses one dot (the classic one starts fresh); the stars all stay
     const g = useGame.getState();
-    const from = g.shownMeter;
-    for (let m = from; m > 0; m--) {
+    const kind = data().rules.meter !== 'streak';
+    // watching it again starts the meter where it was before the not-dry night
+    const from = replay ? meterBefore(today()) : g.shownMeter;
+    const to = preview && !replay ? (kind ? Math.max(0, from - 1) : 0) : Math.min(from, quest().meter);
+    g.set({ shownMeter: from });
+    for (let m = from; m > to; m--) {
       g.set({ shownMeter: m - 1 });
-      await ctx.wait(from > 8 ? 0.05 : 0.1);
+      await ctx.wait(from - to > 8 ? 0.05 : 0.18);
     }
-    if (!preview) g.set({ shownMeter: 0 });
+    g.set({ shownMeter: to });
     sfx.play('sparkle');
     boardCamera(1.4);
-    await say(ctx, 'wet-3', 0.2);
+    // ("only lost one dot" only when that's true: a dry morning a grown-up changed to not dry takes off two)
+    await say(ctx, kind && from - to === 1 ? 'wet-3-kind' : 'wet-3', 0.2);
   } finally {
     clearInterval(hearts);
   }
@@ -1176,8 +1516,8 @@ async function goodbye(ctx: Ctx) {
   play(hero, 'wave', 1.6);
   play(coach, 'wave', 1.6);
   const d = new Date();
-  const lines = ['bye-1', 'bye-2', 'bye-3'];
-  await say(ctx, lines[d.getDate() % 3]);
+  void d;
+  await say(ctx, GOODBYES[dayIndex() % GOODBYES.length]);
   finishMorning();
 }
 
@@ -1193,6 +1533,7 @@ export function replayToday() {
 }
 
 let previewRestore: { stars: number; meter: number; acc: number; chests: number; pants: boolean } | null = null;
+let surpriseTurn = -1;
 let previewSeq = 0;
 
 /** Grown-ups can preview any moment; real progress never changes. */
@@ -1201,6 +1542,7 @@ export function startPreview(kind: PreviewKind, fromChild = false) {
   const g = useGame.getState();
   unlockAudio();
   if (data().settings.music) music.start();
+  clearProps();
   if (!g.preview) previewRestore = { stars: g.shownStars, meter: g.shownMeter, acc: g.shownAccessories, chests: g.openedChests, pants: g.showUnderpants };
   const myPreview = ++previewSeq;
   g.set({ preview: { kind, replay: fromChild }, parentOpen: false, phase: 'event', scene: kind === 'intro' ? 'board' : g.scene });
@@ -1220,12 +1562,19 @@ export function startPreview(kind: PreviewKind, fromChild = false) {
       await meterUp(ctx, g.shownMeter, Math.min(goal - 1, g.shownMeter + (fromChild ? 0 : 1)), goal);
       await surprise(ctx, Math.max(1, target), true);
     } else if (kind === 'wet') {
-      await hug(ctx, true);
+      // watching it again starts the meter where it was before the not-dry night
+      if (fromChild) g.set({ shownMeter: meterBefore(today()) });
+      await hug(ctx, true, fromChild);
     } else if (kind === 'prize') {
       const land = landOf(stars, rules);
       await openChest(ctx, land, true);
     } else if (kind === 'store') {
       await storeVisit(ctx, true);
+    } else if (kind === 'surprise') {
+      // one of the surprises between eggs, a different one each time
+      const kinds = ['balloons', 'fireworks', 'peekaboo', 'highfive', 'dance', 'roar'] as const;
+      surpriseTurn = (surpriseTurn + 1) % kinds.length;
+      await surprise(ctx, Math.max(1, stars), true, kinds[surpriseTurn]);
     } else if (kind === 'intro') {
       await intro(ctx);
     }
@@ -1241,8 +1590,7 @@ async function celebrateStarsPreview(ctx: Ctx, from: number, to: number) {
   play(coach, 'cheer', 1.6);
   sfx.play('fanfare');
   burst('confetti', hero.pos.clone().setY(hero.pos.y + 1.4), { count: 40 });
-  const lines = ['dry-1', 'dry-2', 'dry-3', 'dry-4', 'dry-5', 'dry-6'];
-  await say(ctx, lines[Math.max(0, to - 1) % lines.length], 0.1);
+  await say(ctx, dryCheer(to), 0.1);
   if (to <= from) return;
   const rules = data().rules;
   boardCamera(2.4);
@@ -1268,17 +1616,10 @@ export function endPreview() {
   cancelCutscene();
   const g = useGame.getState();
   const r = previewRestore;
-  chestAnim.land = -1;
-  chestAnim.open = 0;
-  chestAnim.rise = 0;
-  fx.egg.visible = false;
-  fx.prize.visible = false;
-  fx.hand.visible = false;
-  fx.ptero.visible = false;
-  fx.star.active = false;
+  clearProps();
   music.setMood('play');
   if (r) g.set({ shownStars: r.stars, shownMeter: r.meter, shownAccessories: r.acc, openedChests: r.chests, showUnderpants: r.pants });
-  g.set({ preview: null, fade: 0, scene: data().profile.setupDone ? 'board' : 'setup', previewUnderpants: null });
+  g.set({ preview: null, fade: 0, scene: data().profile.setupDone ? 'board' : 'setup', previewUnderpants: null, highlight: null });
   previewRestore = null;
   coach.action.name = 'none';
   hero.action.name = 'none';
@@ -1361,11 +1702,20 @@ export function setupDone() {
   });
 }
 
+let meterTap: (() => void) | null = null;
+let introRoarTap: (() => void) | null = null;
+
+/** The meter at the top right, tapped during the intro. */
+export function tapMeter() {
+  if (useGame.getState().awaiting === 'intro-meter') meterTap?.();
+}
+
 /**
- * Coach Rex explains the mission, with the camera showing each part: why
- * (underwear at night instead of diapers), the morning button and the stars,
- * the prizes along the way, the hug, the meter, and the Underwear Store where
- * Zef picks out underwear for his dino.
+ * Coach Rex explains the mission, with the camera showing each part, and
+ * Zef taps along: the star (his dino hops over and back), the treasure chest
+ * (locked till he gets there), the meter (it fills up to show what full looks
+ * like) and, at the end, his own dino for a big roar. Every tap has a friendly
+ * time limit, so the intro never gets stuck.
  */
 async function intro(ctx: Ctx) {
   const g = useGame.getState();
@@ -1373,19 +1723,39 @@ async function intro(ctx: Ctx) {
   const rules = data().rules;
   const stars = g.shownStars;
   placeAt(stars);
-  prefetch(['intro-1', 'intro-2', 'intro-3', 'intro-prizes', 'intro-4', 'intro-meter', 'intro-store', 'intro-go']);
+  const meterLine = rules.meter === 'streak' ? 'intro-meter' : 'intro-meter-kind';
+  prefetch(['intro-1', 'intro-2', 'intro-3', 'intro-tap-star', 'intro-yes', 'intro-prizes', 'intro-tap-chest', 'intro-chest-tease', 'intro-4', meterLine]);
   closeShot(2);
   play(coach, 'wave', 1.8);
   await say(ctx, 'intro-1');
   play(hero, 'cheer', 1.4);
   await say(ctx, 'intro-2');
-  // the path and the stars
+
+  // the path and the stars: tap the star, and the dino hops over and back
   boardCamera(1.5);
   const next = spacePos(stars + 1, rules);
   hero.look = next.clone();
   await say(ctx, 'intro-3');
+  fx.introStar.pos.copy(next).setY(next.y + 1.15);
+  fx.introStar.visible = true;
+  sfx.play('sparkle');
+  sayAsync('intro-tap-star');
+  await awaitTap(ctx, 'intro-star', 12, (fn) => onIntroStarTap(fn));
+  onIntroStarTap(null);
+  fx.introStar.visible = false;
+  burst('sparkle', fx.introStar.pos.clone(), { count: 34, speed: 3.5 });
+  sfx.play('star');
+  voice.stop();
+  const home = hero.pos.clone();
+  await hopTo(ctx, hero, next.clone().setY(next.y - 0.12), 0.6);
+  play(hero, 'cheer', 1.1);
+  await say(ctx, 'intro-yes', 0.1);
+  await hopTo(ctx, hero, home, 0.6);
   hero.look = null;
-  // the chest at the end of this land: prizes along the way
+  faceCamera(hero);
+
+  // the chest at the end of this land: prizes along the way (it's locked for now)
+  prefetch(['intro-4', meterLine, 'intro-tap-meter', 'intro-meter-full', 'intro-store', 'intro-go', 'intro-roar']);
   const land = landOf(stars, rules);
   const c = chestPos(land, rules);
   shot(c.clone().add(new THREE.Vector3(3, 4, 7)), c.clone().setY(c.y + 1.2), 1.2);
@@ -1393,31 +1763,72 @@ async function intro(ctx: Ctx) {
   g.set({ highlight: 'stars' });
   await say(ctx, 'intro-prizes');
   g.set({ highlight: null });
+  sayAsync('intro-tap-chest');
+  await awaitTap(ctx, 'intro-chest', 12, (fn) => onChestTap(fn));
+  onChestTap(null);
+  voice.stop();
+  sfx.play('boing');
+  chestAnim.wiggle = 2.4;
+  chestAnim.open = 0.22;
+  burst('sparkle', c.clone().setY(c.y + 1.3), { count: 20, speed: 2.5 });
+  await ctx.wait(0.35);
+  chestAnim.open = 0;
+  await say(ctx, 'intro-chest-tease');
   chestAnim.wiggle = 0;
   chestAnim.land = -1;
+
   // not dry: a hug
   closeShot(2);
   play(coach, 'hug', 2.2);
   await say(ctx, 'intro-4');
   coach.action.name = 'none';
-  // the meter: dry nights in a row fill it up
+
+  // the meter: tap it to see what full looks like
   boardCamera(1.5);
   g.set({ highlight: 'meter' });
-  await say(ctx, 'intro-meter');
-  g.set({ highlight: null });
+  await say(ctx, meterLine);
+  sayAsync('intro-tap-meter');
+  await awaitTap(ctx, 'intro-meter', 12, (fn) => (meterTap = fn));
+  meterTap = null;
+  voice.stop();
+  const real = useGame.getState().shownMeter;
+  const full = rules.goal;
+  for (let m = real + 1; m <= full; m++) {
+    g.set({ shownMeter: m });
+    sfx.play('tick', Math.min(9, Math.round((m / full) * 9)));
+    await ctx.wait(full > 12 ? 0.05 : 0.12);
+  }
+  sfx.play('fanfare');
+  await say(ctx, 'intro-meter-full', 0.3);
+  for (let m = full; m > real; m--) {
+    g.set({ shownMeter: m - 1 });
+    await ctx.wait(0.03);
+  }
+  g.set({ shownMeter: real, highlight: null });
+
   // the Underwear Store, far away
   const store = storeLandmarkPos(land, rules);
   shot(hero.pos.clone().add(new THREE.Vector3(2, 4, 8)), store.clone().add(new THREE.Vector3(0, 3, 0)), 1.0);
   await say(ctx, 'intro-store', 0.1);
+
+  // ready? tap your dino for the biggest roar, and Coach Rex roars back
   closeShot(2);
   play(coach, 'cheer', 1.4);
   play(hero, 'cheer', 1.4);
   await say(ctx, 'intro-go', 0);
+  sayAsync('intro-roar');
+  await awaitTap(ctx, 'intro-roar', 10, (fn) => (introRoarTap = fn));
+  introRoarTap = null;
+  voice.stop();
+  useGame.getState().set({ caption: null });
+  play(hero, 'roar', 1.6);
+  sfx.play('roar', 0, 0.8);
+  cam.shake = 0.15;
+  burst('sparkle', hero.pos.clone().setY(hero.pos.y + 1.0), { count: 26, speed: 3 });
+  await ctx.wait(1.0);
   play(coach, 'roar', 1.8);
-  play(hero, 'roar', 1.8);
-  sfx.play('roar', 1, 0.8);
-  sfx.play('roar', 0, 0.6);
-  cam.shake = 0.25;
+  sfx.play('roar', 1, 0.9);
+  cam.shake = 0.28;
   await ctx.wait(1.8);
   boardCamera();
 }
@@ -1447,6 +1858,7 @@ export function removeCurrentChild() {
 /** Re-place the dinos and camera after a grown-up resets or corrects things. */
 export function resetBoardView() {
   const g = useGame.getState();
+  putAwayWardrobe();
   placeAt(g.shownStars);
   boardCamera();
   cam.snap = true;
@@ -1460,6 +1872,7 @@ export function skipIntro() {
     return;
   }
   cancelCutscene();
+  clearProps();
   useSave.getState().setProfile({ setupDone: true });
   g.set({ highlight: null, fade: 0, scene: 'board', setupStep: null });
   placeAt(g.shownStars);

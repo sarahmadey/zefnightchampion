@@ -1,10 +1,10 @@
 // Where everything on the board sits. Lands are laid out one after another
 // along -z, joined by little bridges. Each land has a winding path of
-// stepping stones (10 in the first land, 15 after that) ending at a prize
+// stepping stones (5 in each of the first two lands, 15 after that) ending at a prize
 // chest. Positions are deterministic, so the board looks the same every day.
 
 import * as THREE from 'three';
-import { DEFAULT_RULES, landOf, landRange, type QuestRules } from '../state/progress';
+import { DEFAULT_RULES, landOf, landRange, scheduleKey, type QuestRules } from '../state/progress';
 import { fbm2, mulberry32, smoothstep } from '../three/util';
 
 export const BRIDGE = 9;
@@ -20,7 +20,7 @@ const zCache = new Map<string, number>();
 /** World z of a land's centre. */
 export function landZ(land: number, rules: QuestRules = DEFAULT_RULES): number {
   if (land <= 0) return 0;
-  const key = `${land}:${rules.firstPrize}:${rules.prizeEvery}`;
+  const key = `${land}:${scheduleKey(rules)}`;
   const hit = zCache.get(key);
   if (hit !== undefined) return hit;
   const z = landZ(land - 1, rules) - (landDepth(land - 1, rules) / 2 + BRIDGE + landDepth(land, rules) / 2);
@@ -36,7 +36,7 @@ const curveCache = new Map<string, THREE.CatmullRomCurve3>();
 
 /** The winding path of a land, in world space, from where the bridge arrives to the chest. */
 export function landCurve(land: number, rules: QuestRules = DEFAULT_RULES): THREE.CatmullRomCurve3 {
-  const key = `${land}:${rules.firstPrize}:${rules.prizeEvery}`;
+  const key = `${land}:${scheduleKey(rules)}`;
   const hit = curveCache.get(key);
   if (hit) return hit;
   const d = landDepth(land, rules);
@@ -70,7 +70,7 @@ const spaceCache = new Map<string, THREE.Vector3>();
 
 /** World position of board space `index` (1 = first stone; 0 = the nest). */
 export function spacePos(index: number, rules: QuestRules = DEFAULT_RULES): THREE.Vector3 {
-  const key = `${index}:${rules.firstPrize}:${rules.prizeEvery}`;
+  const key = `${index}:${scheduleKey(rules)}`;
   const hit = spaceCache.get(key);
   if (hit) return hit;
   let p: THREE.Vector3;

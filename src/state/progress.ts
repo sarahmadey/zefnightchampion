@@ -6,26 +6,45 @@
 //
 // - Every dry morning is a star. Stars never go away: the board only ever
 //   moves forward.
-// - The underpants meter counts dry mornings since the most recent wet one.
-//   A wet morning starts it fresh. A morning with no record is unknown: it
-//   neither adds to the meter nor resets it.
-// - Prizes come from total stars: the first at `firstPrize` stars, then one
-//   every `prizeEvery` stars after that (10, 25, 40, ... by default).
+// - The underwear meter: every dry morning adds a dot. In the kinder mode (the
+//   default) a wet morning takes one dot away; in the classic mode it starts
+//   the meter over, so the meter counts dry mornings in a row. A morning with
+//   no record is unknown: it neither adds nor takes away.
+// - Prizes come from total stars: an early one at `earlyPrize` stars, then at
+//   `firstPrize` stars, then one every `prizeEvery` stars after that (5, 10,
+//   25, 40, ... by default).
 
 export type NightResult = 'dry' | 'wet';
 export type DateKey = string;
 export type Records = Record<DateKey, NightResult>;
 
+/** What a wet morning does to the meter: take one dot off, or start it over. */
+export type MeterMode = 'kind' | 'streak';
+
 export interface QuestRules {
-  /** Dry nights in a row that earn underpants. */
+  /** Dots on the meter that earn underwear. */
   goal: number;
-  /** Stars for the first prize. */
+  /** Stars for an extra, early prize before `firstPrize` (0 = none). */
+  earlyPrize: number;
+  /** Stars for the first regular prize. */
   firstPrize: number;
   /** Stars between later prizes. */
   prizeEvery: number;
+  meter: MeterMode;
+  /**
+   * The kinder meter's first morning, for an adventure that began before it
+   * existed: wet mornings before this date still started the meter over, so
+   * switching never makes the meter jump. Null: kinder from the start.
+   */
+  kindFrom: DateKey | null;
 }
 
-export const DEFAULT_RULES: QuestRules = { goal: 20, firstPrize: 10, prizeEvery: 15 };
+export const DEFAULT_RULES: QuestRules = { goal: 20, earlyPrize: 5, firstPrize: 10, prizeEvery: 15, meter: 'kind', kindFrom: null };
+
+/** A key for caches that depend on where the chests are. */
+export function scheduleKey(rules: QuestRules): string {
+  return `${rules.earlyPrize}:${rules.firstPrize}:${rules.prizeEvery}`;
+}
 export const GOAL_MIN = 3;
 export const GOAL_MAX = 60;
 
@@ -95,24 +114,33 @@ export function sortedKeys(records: Records): DateKey[] {
 
 // ---------------------------------------------------------------- prizes
 
+function hasEarly(rules: QuestRules): boolean {
+  return rules.earlyPrize > 0 && rules.earlyPrize < rules.firstPrize;
+}
+
 /** Stars needed for prize number `i` (0-based). */
 export function prizeThreshold(i: number, rules: QuestRules = DEFAULT_RULES): number {
+  if (hasEarly(rules)) {
+    if (i <= 0) return rules.earlyPrize;
+    return rules.firstPrize + (i - 1) * rules.prizeEvery;
+  }
   return rules.firstPrize + i * rules.prizeEvery;
 }
 
 /** How many prizes `stars` stars have earned. */
 export function prizesEarned(stars: number, rules: QuestRules = DEFAULT_RULES): number {
-  if (stars < rules.firstPrize) return 0;
-  return 1 + Math.floor((stars - rules.firstPrize) / rules.prizeEvery);
+  const early = hasEarly(rules) && stars >= rules.earlyPrize ? 1 : 0;
+  if (stars < rules.firstPrize) return early;
+  return early + 1 + Math.floor((stars - rules.firstPrize) / rules.prizeEvery);
 }
 
 /**
  * The board is split into lands, each ending at a prize chest. Land 0 holds
- * spaces 1..firstPrize; land i holds the spaces after prize i-1 up to prize i.
- * `start` is the space the land begins from (0 = the nest).
+ * spaces 1 up to the first prize; land i holds the spaces after prize i-1 up
+ * to prize i. `start` is the space the land begins from (0 = the nest).
  */
 export function landRange(land: number, rules: QuestRules = DEFAULT_RULES): { start: number; end: number } {
-  if (land <= 0) return { start: 0, end: rules.firstPrize };
+  if (land <= 0) return { start: 0, end: prizeThreshold(0, rules) };
   return { start: prizeThreshold(land - 1, rules), end: prizeThreshold(land, rules) };
 }
 
@@ -127,9 +155,9 @@ export interface QuestState {
   /** Every dry morning ever recorded. */
   stars: number;
   wets: number;
-  /** Dry mornings since the latest wet one (unknown mornings pause it). */
+  /** Dots on the meter: dry mornings in a row (classic), or dry minus wet, never below 0 (kinder). */
   meter: number;
-  /** Longest meter run ever. */
+  /** Longest run of dry mornings in a row ever. */
   best: number;
   latest: { date: DateKey; result: NightResult } | null;
   lastWet: DateKey | null;
@@ -144,6 +172,7 @@ export function computeQuest(records: Records, rules: QuestRules = DEFAULT_RULES
   let wets = 0;
   let run = 0;
   let best = 0;
+  let meter = 0;
   let lastWet: DateKey | null = null;
   let goalReachedOn: DateKey | null = null;
   const keys = sortedKeys(records);
@@ -151,11 +180,14 @@ export function computeQuest(records: Records, rules: QuestRules = DEFAULT_RULES
     if (records[k] === 'dry') {
       stars++;
       run++;
+      meter++;
       if (run > best) best = run;
-      if (run >= rules.goal && !goalReachedOn) goalReachedOn = k;
+      if (meter >= rules.goal && !goalReachedOn) goalReachedOn = k;
     } else {
       wets++;
       run = 0;
+      const kind = rules.meter === 'kind' && (!rules.kindFrom || k >= rules.kindFrom);
+      meter = kind ? Math.max(0, meter - 1) : 0;
       lastWet = k;
     }
   }
@@ -164,7 +196,7 @@ export function computeQuest(records: Records, rules: QuestRules = DEFAULT_RULES
   return {
     stars,
     wets,
-    meter: run,
+    meter,
     best,
     latest: last ? { date: last, result: records[last] } : null,
     lastWet,

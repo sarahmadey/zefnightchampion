@@ -46,7 +46,9 @@ STYLE = ("Speak like a fun, high-energy children's TV host: bright and warm, smi
 MOODS = [
     (r'^wet-', 'Gentle, warm and reassuring, still upbeat and smiling.'),
     (r'^(ask|ask-short|already)$', 'Curious and warm, asking a little kid a question.'),
-    (r'^intro-(3|4|prizes|meter)$', 'Clear and upbeat, explaining a fun game to a little kid.'),
+    (r'^intro-(3|4|prizes|meter|meter-kind)$', 'Clear and upbeat, explaining a fun game to a little kid.'),
+    (r'^peekaboo', 'Playful and giggly, playing hide and seek with a little kid.'),
+    (r'^(balloons|fireworks)', 'Bursting with joy and celebrating, big and bouncy.'),
     (r'^(intro|greet|pick|picked|color)', 'Excited and warm, like telling a kid great news.'),
     (r'^(dry|first-star|hop|highfive|roar|dance|store)', 'Bursting with joy and celebrating, big and bouncy.'),
     (r'^(egg|acc-)', 'Amazed and excited, like opening a surprise.'),

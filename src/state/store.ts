@@ -24,7 +24,7 @@ import {
   type CloudDoc,
   type Library,
 } from './library';
-import { computeQuest, type DateKey, type NightResult, type QuestState } from './progress';
+import { computeQuest, type DateKey, type MeterMode, type NightResult, type QuestState } from './progress';
 import type { Prize, Slot } from '../game/rewards';
 
 /**
@@ -51,6 +51,8 @@ interface SaveStore {
   setSettings: (patch: Partial<Settings>) => void;
   setProfile: (patch: Partial<Profile>) => void;
   setGoal: (goal: number) => void;
+  /** what a not-dry night does to the meter */
+  setMeterMode: (mode: MeterMode) => void;
   setPrizes: (prizes: Prize[]) => void;
   setPrizeGiven: (i: number, given: boolean) => void;
   setOutfit: (slot: Slot, accessory: number) => void;
@@ -127,6 +129,10 @@ export const useSave = create<SaveStore>((set, get) => {
     setGoal(goal) {
       const d = get().data;
       put(applyDerived({ ...d, rules: { ...d.rules, goal: clampGoal(goal) } }));
+    },
+    setMeterMode(mode) {
+      const d = get().data;
+      put(applyDerived({ ...d, rules: { ...d.rules, meter: mode } }));
     },
     setPrizes(prizes) {
       put({ ...get().data, prizes });
@@ -226,7 +232,7 @@ export type Phase =
   | 'event' // a celebration, hug, prize or store visit is playing
   | 'done'; // today is recorded: see you tomorrow
 
-export type PreviewKind = 'dry' | 'wet' | 'prize' | 'store' | 'intro';
+export type PreviewKind = 'dry' | 'wet' | 'prize' | 'store' | 'intro' | 'surprise';
 
 export interface PreviewState {
   kind: PreviewKind;
@@ -281,7 +287,22 @@ interface GameStore {
   /** dress-up shelf is open */
   dressUp: boolean;
   /** waiting for the child to tap something during an event */
-  awaiting: null | 'highfive' | 'egg' | 'collect' | 'roar' | 'chest' | 'store-pick' | 'hug-done';
+  awaiting:
+    | null
+    | 'highfive'
+    | 'egg'
+    | 'collect'
+    | 'roar'
+    | 'chest'
+    | 'store-pick'
+    | 'hug-done'
+    | 'balloons'
+    | 'fireworks'
+    | 'peekaboo'
+    | 'intro-star'
+    | 'intro-chest'
+    | 'intro-meter'
+    | 'intro-roar';
   /** increments to ask the director to re-check progress */
   checkToken: number;
   set: (patch: Partial<Omit<GameStore, 'set'>>) => void;

@@ -63,24 +63,32 @@ describe('date keys', () => {
 });
 
 describe('prizes and lands', () => {
-  it('gives the first prize at 10 stars, then every 15', () => {
-    expect([0, 1, 2, 3].map((i) => prizeThreshold(i))).toEqual([10, 25, 40, 55]);
-    expect(prizesEarned(9)).toBe(0);
-    expect(prizesEarned(10)).toBe(1);
-    expect(prizesEarned(24)).toBe(1);
-    expect(prizesEarned(25)).toBe(2);
-    expect(prizesEarned(100)).toBe(7);
+  it('gives prizes at 5 and 10 stars, then every 15', () => {
+    expect([0, 1, 2, 3, 4].map((i) => prizeThreshold(i))).toEqual([5, 10, 25, 40, 55]);
+    expect(prizesEarned(4)).toBe(0);
+    expect(prizesEarned(5)).toBe(1);
+    expect(prizesEarned(9)).toBe(1);
+    expect(prizesEarned(10)).toBe(2);
+    expect(prizesEarned(24)).toBe(2);
+    expect(prizesEarned(25)).toBe(3);
+    expect(prizesEarned(100)).toBe(8);
+    // without the early prize: 10, 25, 40, ...
+    const classic = { ...DEFAULT_RULES, earlyPrize: 0 };
+    expect([0, 1, 2].map((i) => prizeThreshold(i, classic))).toEqual([10, 25, 40]);
+    expect(prizesEarned(25, classic)).toBe(2);
   });
 
-  it('splits the board into a 10-space land and then 15-space lands', () => {
-    expect(landRange(0)).toEqual({ start: 0, end: 10 });
-    expect(landRange(1)).toEqual({ start: 10, end: 25 });
-    expect(landRange(2)).toEqual({ start: 25, end: 40 });
+  it('splits the board into two 5-space lands and then 15-space lands', () => {
+    expect(landRange(0)).toEqual({ start: 0, end: 5 });
+    expect(landRange(1)).toEqual({ start: 5, end: 10 });
+    expect(landRange(2)).toEqual({ start: 10, end: 25 });
+    expect(landRange(3)).toEqual({ start: 25, end: 40 });
     expect(landOf(0)).toBe(0);
-    expect(landOf(9)).toBe(0);
+    expect(landOf(4)).toBe(0);
     // reaching the chest finishes the land and the board moves on
-    expect(landOf(10)).toBe(1);
-    expect(landOf(26)).toBe(2);
+    expect(landOf(5)).toBe(1);
+    expect(landOf(10)).toBe(2);
+    expect(landOf(26)).toBe(3);
   });
 
   it('cycles through the prize list', () => {
@@ -98,16 +106,52 @@ describe('quest', () => {
     const q = computeQuest(r);
     expect(q.stars).toBe(8);
     expect(q.wets).toBe(1);
-    expect(q.meter).toBe(3);
+    // the kinder meter: 5 dots, one taken away, 3 more
+    expect(q.meter).toBe(7);
     expect(q.best).toBe(5);
     expect(q.lastWet).toBe('2026-10-06');
   });
 
-  it('starts the meter fresh on a wet morning', () => {
+  it('takes one dot off the meter for a wet morning (never below zero)', () => {
     const q = computeQuest({ ...dryRun('2026-10-12', 6), [TODAY]: 'wet' });
-    expect(q.meter).toBe(0);
+    expect(q.meter).toBe(5);
     expect(q.stars).toBe(6);
     expect(q.latest).toEqual({ date: TODAY, result: 'wet' });
+    expect(computeQuest({ '2026-10-11': 'wet', '2026-10-12': 'wet', [TODAY]: 'dry' }).meter).toBe(1);
+  });
+
+  it('starts the meter fresh on a wet morning in the classic mode', () => {
+    const classic = { ...DEFAULT_RULES, meter: 'streak' as const };
+    const q = computeQuest({ ...dryRun('2026-10-12', 6), [TODAY]: 'wet' }, classic);
+    expect(q.meter).toBe(0);
+    expect(computeQuest({ ...dryRun('2026-10-05', 5), '2026-10-06': 'wet', ...dryRun('2026-10-09', 3) }, classic).meter).toBe(3);
+  });
+
+  it('gives an older adventure the kinder meter from its next morning, so the meter never jumps', () => {
+    // recorded before the kinder meter: 8 dry, a wet night, 3 dry (a classic meter of 3)
+    const r: Records = { ...dryRun('2026-10-05', 8), '2026-10-06': 'wet', ...dryRun('2026-10-09', 3) };
+    const old = normalizeSave({ app: APP_ID, version: 1, records: r, rules: { goal: 10 } }, NOW)!;
+    expect(old.rules.meter).toBe('kind');
+    expect(old.rules.kindFrom).toBe('2026-10-10');
+    expect(computeQuest(old.records, old.rules).meter).toBe(3);
+    expect(old.underpants.earned).toBe(false);
+    // from then on a wet morning takes only one dot off
+    expect(computeQuest({ ...r, '2026-10-10': 'wet' }, old.rules).meter).toBe(2);
+    // the same nights in an adventure that had the kinder meter from the start
+    expect(computeQuest(r, { ...DEFAULT_RULES, goal: 10 }).meter).toBe(10);
+    expect(normalizeSave({ ...old }, NOW)!.rules.kindFrom).toBe('2026-10-10');
+    expect(defaultSave(NOW).rules.kindFrom).toBeNull();
+  });
+
+  it('only fills the kinder meter when dry nights clearly win', () => {
+    // dry, dry, wet, over and over: two steps forward, one back
+    const r: Records = {};
+    for (let i = 0; i < 30; i++) r[addDays('2026-09-01', i)] = i % 3 === 2 ? 'wet' : 'dry';
+    expect(computeQuest(r, { ...DEFAULT_RULES, goal: 10 }).goalReachedOn).not.toBeNull();
+    // dry, wet, dry, wet: never gets anywhere
+    const half: Records = {};
+    for (let i = 0; i < 40; i++) half[addDays('2026-09-01', i)] = i % 2 ? 'wet' : 'dry';
+    expect(computeQuest(half, { ...DEFAULT_RULES, goal: 5 }).goalReachedOn).toBeNull();
   });
 
   it('treats unrecorded mornings as unknown: they neither add nor reset', () => {
@@ -126,7 +170,8 @@ describe('quest', () => {
 
   it('previews a correction without changing the records', () => {
     const r = dryRun('2026-10-12', 3);
-    expect(questIfRecorded(r, TODAY, 'wet').meter).toBe(0);
+    expect(questIfRecorded(r, TODAY, 'wet').meter).toBe(2);
+    expect(questIfRecorded(r, TODAY, 'wet', { ...DEFAULT_RULES, meter: 'streak' }).meter).toBe(0);
     expect(questIfRecorded(r, '2026-10-12', null).stars).toBe(2);
     expect(Object.keys(r)).toHaveLength(3);
   });
@@ -142,9 +187,12 @@ describe('surprises and accessories', () => {
     expect(surpriseFor(1)).toBe('egg');
     expect(surpriseFor(2)).toBe('highfive');
     expect(surpriseFor(3)).toBe('egg');
-    expect(surpriseFor(4)).toBe('dance');
-    expect(surpriseFor(6)).toBe('roar');
-    expect(surpriseFor(8)).toBe('highfive');
+    expect(surpriseFor(4)).toBe('balloons');
+    expect(surpriseFor(6)).toBe('dance');
+    expect(surpriseFor(8)).toBe('peekaboo');
+    expect(surpriseFor(10)).toBe('roar');
+    expect(surpriseFor(12)).toBe('fireworks');
+    expect(surpriseFor(14)).toBe('highfive');
     expect(accessoryForStar(1)).toBe(0);
     expect(accessoryForStar(5)).toBe(2);
     expect(accessoryForStar(4)).toBeNull();
@@ -190,7 +238,7 @@ describe('save data', () => {
     expect(d.underpants.on).toBe('2026-10-12');
     d = withRecord(d, TODAY, 'wet', NOW);
     expect(d.underpants.earned).toBe(true);
-    expect(computeQuest(d.records, d.rules).meter).toBe(0);
+    expect(computeQuest(d.records, d.rules).meter).toBe(19);
   });
 
   it('earns underpants when a grown-up lowers the goal below the current run', () => {
@@ -217,7 +265,7 @@ describe('save data', () => {
     if (!res.ok) return;
     expect(res.recordCount).toBe(13);
     expect(res.data.profile.species).toBe('stego');
-    expect(res.data.seen).toEqual({ stars: 12, prizes: 1, hugDate: TODAY, underpants: false, meter: 0 });
+    expect(res.data.seen).toEqual({ stars: 12, prizes: 2, hugDate: TODAY, underpants: false, meter: 11 });
   });
 
   it('imports the nights from an old candy-castle backup', () => {

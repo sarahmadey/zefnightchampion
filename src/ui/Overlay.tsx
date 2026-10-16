@@ -8,7 +8,10 @@ import { useEffect, useRef, useState } from 'react';
 import { childList, useGame, useQuest, useSave } from '../state/store';
 import {
   addChildFromTitle,
+  closeWardrobe,
   collectPrize,
+  openWardrobe,
+  toggleOutfit,
   endPreview,
   playChild,
   pressDry,
@@ -21,14 +24,17 @@ import {
   setupPickSpecies,
   setupWelcomeDone,
   skipIntro,
+  tapMeter,
 } from '../game/director';
 import { DinoBadge } from './DinoBadge';
 import { GoalChips } from './GoalChips';
 import { HOW_LEAD, HowItWorksSheet, HowItWorksSteps } from './HowItWorks';
 import { ParentButton, ParentPanel } from './ParentArea';
-import { ArrowIcon, BigHeartIcon, ChestIcon, ReplayIcon, SoundOffIcon, SoundOnIcon, StarIcon, UnderpantsIcon, BigSunIcon } from './icons';
+import { ArrowIcon, BigHeartIcon, ChestIcon, CheckIcon, HangerIcon, ReplayIcon, SoundOffIcon, SoundOnIcon, StarIcon, UnderpantsIcon, BigSunIcon } from './icons';
+import { accessoryThumb } from './thumbs';
+import { useOutfit } from '../board/Board';
 import { landRange, landOf } from '../state/progress';
-import { DINO_COLORS, SPECIES } from '../game/rewards';
+import { ACCESSORIES, DINO_COLORS, SPECIES } from '../game/rewards';
 import { setSoundOn } from '../audio/core';
 import { sfx } from '../audio/sfx';
 
@@ -95,11 +101,17 @@ function UnderwearMeter() {
   const highlight = useGame((s) => s.highlight);
   const goal = useSave((s) => s.data.rules.goal);
   const earned = useSave((s) => s.data.underpants.earned);
+  const tappable = useGame((s) => s.awaiting === 'intro-meter');
   if (scene !== 'board') return null;
   const filled = Math.min(goal, meter);
   const dots = Array.from({ length: goal }, (_, i) => goal - 1 - i);
   return (
-    <div className={`meter${highlight === 'meter' ? ' glow' : ''}${earned ? ' earned' : ''}`} role="img" aria-label={`Underwear meter: ${filled} of ${goal} dry nights in a row${earned ? ' — ready for underwear at night!' : ''}`}>
+    <div
+      className={`meter${highlight === 'meter' ? ' glow' : ''}${earned ? ' earned' : ''}${tappable ? ' tappable' : ''}`}
+      role={tappable ? 'button' : 'img'}
+      aria-label={tappable ? 'Tap the underwear meter' : `Underwear meter: ${filled} of ${goal}${earned ? ' — ready for underwear at night!' : ''}`}
+      onClick={tappable ? () => tapMeter() : undefined}
+    >
       <div className="meter-top">
         <UnderpantsIcon size={46} gold={earned || filled >= goal} />
       </div>
@@ -262,10 +274,17 @@ function MorningButtons() {
 function Done() {
   const phase = useGame((s) => s.phase);
   const cutscene = useGame((s) => s.cutscene);
+  const dressUp = useGame((s) => s.dressUp);
+  const collected = useGame((s) => s.shownAccessories);
   const quest = useQuest();
-  if (phase !== 'done' || cutscene) return null;
+  if (phase !== 'done' || cutscene || dressUp) return null;
   return (
     <div className="done">
+      {collected > 0 && (
+        <button className="round-btn dress" onClick={() => openWardrobe()} aria-label="Dress up your dino">
+          <HangerIcon />
+        </button>
+      )}
       <div className="done-card">
         <span className="done-text">See you tomorrow!</span>
         <span className="done-sub">
@@ -274,6 +293,64 @@ function Done() {
       </div>
       <button className="round-btn" onClick={() => replayToday()} aria-label="Watch it again">
         <ReplayIcon />
+      </button>
+    </div>
+  );
+}
+
+/** The wardrobe: pictures of everything collected; tap to put on or take off. */
+function Wardrobe() {
+  const open = useGame((s) => s.dressUp && s.phase === 'done' && s.scene === 'board' && !s.preview);
+  const collected = useGame((s) => s.shownAccessories);
+  const species = useSave((s) => s.data.profile.species);
+  const outfit = useOutfit();
+  // pictures by dino and item, so another child's wardrobe never shows the wrong dino
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!open) return;
+    // draw the pictures one at a time so the wardrobe opens straight away
+    let cancelled = false;
+    let i = 0;
+    const next = () => {
+      if (cancelled || i >= collected) return;
+      const url = accessoryThumb(i, species);
+      const k = `${species}:${i}`;
+      if (url) setThumbs((t) => (t[k] === url ? t : { ...t, [k]: url }));
+      i++;
+      setTimeout(next, 0);
+    };
+    const t = setTimeout(next, 60);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [open, collected, species]);
+  if (!open) return null;
+  return (
+    <div className="wardrobe" role="dialog" aria-label="Dress up">
+      <div className="wardrobe-grid">
+        {ACCESSORIES.slice(0, collected).map((a, i) => {
+          const worn = outfit[a.slot] === i;
+          const thumb = thumbs[`${species}:${i}`];
+          return (
+            <button key={a.id} className={`wardrobe-item${worn ? ' worn' : ''}`} onClick={() => toggleOutfit(i)} aria-pressed={worn} aria-label={a.name}>
+              {thumb ? <img src={thumb} alt="" draggable={false} /> : <span className="thumb-wait" />}
+              {worn && (
+                <span className="worn-badge" aria-hidden>
+                  <CheckIcon />
+                </span>
+              )}
+            </button>
+          );
+        })}
+        {collected < ACCESSORIES.length && (
+          <span className="wardrobe-item mystery" aria-label="More to find in eggs">
+            ?
+          </span>
+        )}
+      </div>
+      <button className="wardrobe-done" onClick={() => closeWardrobe()} aria-label="Done dressing up">
+        <CheckIcon />
       </button>
     </div>
   );
@@ -322,6 +399,7 @@ function SkipIntro() {
 function SetupName() {
   const name = useSave((s) => s.data.profile.name);
   const canGoBack = useGame((s) => s.setupBack);
+  const meterMode = useSave((s) => s.data.rules.meter);
   const [value, setValue] = useState(name);
   const ok = value.trim().length > 0;
   return (
@@ -339,11 +417,12 @@ function SetupName() {
         <input value={value} placeholder="Name" onChange={(e) => setValue(e.target.value)} maxLength={24} autoComplete="off" />
       </label>
       <div className="name-field">
-        <span>How many dry nights in a row fill the underwear meter?</span>
-        <GoalChips label="Dry nights in a row to fill the meter" />
+        <span>How many dry nights fill the underwear meter?</span>
+        <GoalChips label="Dry nights to fill the meter" />
       </div>
       <p className="muted small">
-        Tip: if dry nights are still rare, start small. A goal they can reach feels great, and you can change it any time behind the moon button.
+        {meterMode === 'streak' ? 'The meter fills with dry nights in a row.' : 'Each dry night adds a dot, and a not-dry night only takes one away.'} Tip:
+        if dry nights are still rare, start small. A goal they can reach feels great, and you can change it any time behind the moon button.
       </p>
       <div className="row setup-actions">
         {canGoBack && (
@@ -461,6 +540,7 @@ export function Overlay() {
           <CollectButton />
           <MorningButtons />
           <Done />
+          <Wardrobe />
           <SetupBottom />
         </div>
       </div>

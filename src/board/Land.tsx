@@ -5,7 +5,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { DEFAULT_RULES, landRange, type QuestRules } from '../state/progress';
+import { DEFAULT_RULES, landRange, scheduleKey, type QuestRules } from '../state/progress';
 import { BRIDGE, bridgeEnds, groundHeight, landCurve, landDepth, landZ, spacePos } from './layout';
 import { InstancedSet, distToPath, landScatter, swaying } from './decor';
 import { themeFor, type DecorSpec } from './themes';
@@ -23,7 +23,7 @@ const C = new THREE.Color();
 const C2 = new THREE.Color();
 
 function landGround(land: number, rules: QuestRules): THREE.BufferGeometry {
-  return cachedGeo(`ground-${land}-${rules.firstPrize}-${rules.prizeEvery}`, () => {
+  return cachedGeo(`ground-${land}-${scheduleKey(rules)}`, () => {
     const theme = themeFor(land);
     const d = landDepth(land, rules);
     const z0 = landZ(land, rules);

@@ -157,6 +157,14 @@ export function HeartIcon() {
   );
 }
 
+export function CheckIcon() {
+  return (
+    <svg {...common} width={34} height={34}>
+      <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function HangerIcon() {
   return (
     <svg {...common} width={28} height={28}>

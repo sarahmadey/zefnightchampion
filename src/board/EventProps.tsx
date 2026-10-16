@@ -1,6 +1,7 @@
 // Things that appear during a morning event: the big star that flies to the
 // board, the mystery egg that cracks open and the prize that floats out of it,
-// the glowing high-five target, and the friendly pterodactyl that flies Zef
+// the glowing high-five target, balloons to pop, fireworks tapped into the
+// sky, bushes for hide-and-seek, and the friendly pterodactyl that flies Zef
 // to the Underwear Store.
 
 import { useMemo, useRef } from 'react';
@@ -16,12 +17,22 @@ import { Ellipsoid, RoundCone, Sculpt, meshSculpt } from '../dino/sdf';
 import { skinMaterial } from '../dino/skin';
 import { buildAccessory } from '../dino/accessories';
 import { ACCESSORIES, type Species } from '../game/rewards';
+import { useGame } from '../state/store';
+import { bushGeometry } from './props';
 
 export const fx = {
   star: { active: false, t: 0, dur: 1.3, to: new THREE.Vector3(), from: new THREE.Vector3(), started: false, done: null as null | (() => void) },
   egg: { visible: false, pos: new THREE.Vector3(), wobble: 0, crack: 0, hatch: 0, pop: 0 },
   /** the prize out of the egg, shown big and spinning before it goes on */
   prize: { visible: false, index: -1, species: 'trex' as Species, pos: new THREE.Vector3(), size: 1, float: 1 },
+  /** balloons to pop: each floats until it's tapped */
+  balloons: { active: false, items: [] as { pos: THREE.Vector3; popped: boolean; pop: number }[] },
+  /** fireworks on their way up: each bursts when it reaches the sky */
+  rockets: [] as { from: THREE.Vector3; to: THREE.Vector3; t: number; colors: string[] }[],
+  /** the star to tap during the intro, over the next stone */
+  introStar: { visible: false, pos: new THREE.Vector3() },
+  /** hide-and-seek bushes */
+  bushes: { active: false, items: [] as { pos: THREE.Vector3; wiggle: number; scale: number; heading: number }[] },
   hand: { visible: false, pos: new THREE.Vector3(), follow: null as null | { hand: THREE.Vector3 } },
   ptero: { visible: false, pos: new THREE.Vector3(), heading: 0, flap: 1, carry: false },
 };
@@ -29,6 +40,39 @@ export const fx = {
 let eggTap: (() => void) | null = null;
 let handTap: (() => void) | null = null;
 let prizeTap: (() => void) | null = null;
+let balloonTap: ((i: number) => void) | null = null;
+let skyTap: ((p: THREE.Vector3) => void) | null = null;
+let bushTap: ((i: number) => void) | null = null;
+let introStarTap: (() => void) | null = null;
+export function onIntroStarTap(fn: (() => void) | null) {
+  introStarTap = fn;
+}
+export function onBalloonTap(fn: ((i: number) => void) | null) {
+  balloonTap = fn;
+}
+export function onSkyTap(fn: ((p: THREE.Vector3) => void) | null) {
+  skyTap = fn;
+}
+export function onBushTap(fn: ((i: number) => void) | null) {
+  bushTap = fn;
+}
+
+const FIREWORK_COLORS = [
+  ['#ff5c8a', '#ffd1e0', '#ffffff'],
+  ['#ffd43b', '#fff3a8', '#ff922b'],
+  ['#4dabf7', '#a5d8ff', '#ffffff'],
+  ['#69db7c', '#d3f9d8', '#fff3a8'],
+  ['#b197fc', '#e5dbff', '#ffd1f0'],
+];
+let rocketN = 0;
+
+/** Send a firework up to `to`; it bursts there. */
+export function launchFirework(to: THREE.Vector3) {
+  const from = to.clone();
+  from.y = Math.min(to.y - 4, 0.5);
+  fx.rockets.push({ from, to: to.clone(), t: 0, colors: FIREWORK_COLORS[rocketN++ % FIREWORK_COLORS.length] });
+  sfx.play('firework');
+}
 export function onEggTap(fn: (() => void) | null) {
   eggTap = fn;
 }
@@ -238,7 +282,7 @@ function Egg() {
 // -------------------------------------------------------------- the prize
 
 /** The accessory on its own, centred and one unit across (shoes come as a pair). */
-function showcaseModel(index: number, species: Species): THREE.Group {
+export function showcaseModel(index: number, species: Species): THREE.Group {
   const inner = new THREE.Group();
   if (ACCESSORIES[index].slot === 'feet') {
     for (const side of [-1, 1]) {
@@ -306,6 +350,213 @@ function PrizeShowcase() {
         <sphereGeometry args={[0.75, 10, 8]} />
       </mesh>
     </group>
+  );
+}
+
+// -------------------------------------------------------------- the intro's star
+
+function IntroStar() {
+  const g = useRef<THREE.Group>(null!);
+  const st = useRef({ t: 0 });
+  const geo = useMemo(() => cachedGeo('big-star', () => extrude(starShape(5, 0.5, 0.22, 0.25), 0.16, 0.06, 6)), []);
+  useFrame((_, raw) => {
+    const s = fx.introStar;
+    g.current.visible = s.visible;
+    if (!s.visible) return;
+    st.current.t += frameDt(raw);
+    const t = st.current.t;
+    g.current.position.copy(s.pos);
+    g.current.position.y += Math.sin(t * 2.4) * 0.08;
+    g.current.rotation.y = t * 1.6;
+    g.current.scale.setScalar(1 + Math.sin(t * 5) * 0.07);
+  });
+  return (
+    <group ref={g} visible={false}>
+      <mesh geometry={geo} material={starMat} raycast={() => null} />
+      <Glow color="#ffe066" size={2.2} opacity={0.55} />
+      <mesh
+        visible={false}
+        onPointerDown={(ev) => {
+          if (!introStarTap) return;
+          ev.stopPropagation();
+          introStarTap();
+        }}
+      >
+        <sphereGeometry args={[0.85, 10, 8]} />
+      </mesh>
+    </group>
+  );
+}
+
+// -------------------------------------------------------------- balloons
+
+const BALLOON_COLORS = ['#ff4d6d', '#ffd43b', '#4dabf7', '#69db7c', '#b197fc', '#ff922b'];
+export const MAX_BALLOONS = BALLOON_COLORS.length;
+const balloonMats = BALLOON_COLORS.map(
+  (c) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.12, sheen: 0.4, sheenColor: new THREE.Color('#ffffff') }),
+);
+const stringMat = new THREE.MeshStandardMaterial({ color: '#f1f3f5', roughness: 0.8 });
+
+function balloonGeometry() {
+  return cachedGeo('balloon', () => {
+    const prof: [number, number][] = [
+      [0.0, 0.0],
+      [0.045, 0.015],
+      [0.05, 0.05],
+      [0.13, 0.11],
+      [0.23, 0.23],
+      [0.285, 0.38],
+      [0.275, 0.52],
+      [0.215, 0.65],
+      [0.12, 0.73],
+      [0.0, 0.76],
+    ];
+    const g = new THREE.LatheGeometry(
+      prof.map(([r, y]) => new THREE.Vector2(r, y)),
+      28,
+    );
+    g.computeVertexNormals();
+    return g;
+  });
+}
+
+function balloonString() {
+  return cachedGeo('balloon-string', () => tube(curveFrom([[0, 0, 0], [0.04, -0.25, 0.02], [-0.03, -0.5, -0.02], [0.02, -0.8, 0]], 0), { segments: 16, radial: 4, radius: () => 0.006 }));
+}
+
+function Balloons() {
+  const groups = useRef<(THREE.Group | null)[]>([]);
+  const st = useRef({ t: 0 });
+  useFrame((_, raw) => {
+    const dt = frameDt(raw);
+    st.current.t += dt;
+    const b = fx.balloons;
+    for (let i = 0; i < MAX_BALLOONS; i++) {
+      const g = groups.current[i];
+      if (!g) continue;
+      const it = b.items[i];
+      const show = b.active && !!it && it.pop < 1;
+      g.visible = show;
+      if (!show) continue;
+      if (it.popped) it.pop = Math.min(1, it.pop + dt * 14);
+      g.position.copy(it.pos);
+      g.position.y += Math.sin(st.current.t * 1.6 + i * 1.3) * 0.08;
+      g.rotation.z = Math.sin(st.current.t * 1.1 + i) * 0.1;
+      g.scale.setScalar(it.popped ? Math.max(0.001, (1 + it.pop * 0.5) * (1 - it.pop)) : 1);
+    }
+  });
+  return (
+    <>
+      {BALLOON_COLORS.map((_, i) => (
+        <group key={i} ref={(el) => (groups.current[i] = el)} visible={false}>
+          <mesh geometry={balloonGeometry()} material={balloonMats[i]} raycast={() => null} />
+          <mesh geometry={balloonString()} material={stringMat} raycast={() => null} />
+          <mesh
+            visible={false}
+            position={[0, 0.38, 0]}
+            onPointerDown={(ev) => {
+              if (!balloonTap) return;
+              ev.stopPropagation();
+              balloonTap(i);
+            }}
+          >
+            <sphereGeometry args={[0.46, 10, 8]} />
+          </mesh>
+        </group>
+      ))}
+    </>
+  );
+}
+
+// -------------------------------------------------------------- fireworks
+
+/** Rockets fly up and burst; while it's fireworks time, a tap anywhere in the sky sends one up. */
+function Fireworks() {
+  const catching = useGame((s) => s.awaiting === 'fireworks');
+  const camera = useThree((s) => s.camera);
+  const catcher = useRef<THREE.Mesh>(null);
+  const fwd = useMemo(() => new THREE.Vector3(), []);
+  useFrame((_, raw) => {
+    const dt = frameDt(raw);
+    if (catcher.current) {
+      camera.getWorldDirection(fwd);
+      catcher.current.position.copy(camera.position).addScaledVector(fwd, 16);
+      catcher.current.quaternion.copy(camera.quaternion);
+    }
+    for (let i = fx.rockets.length - 1; i >= 0; i--) {
+      const r = fx.rockets[i];
+      r.t += dt / 0.5;
+      const u = ease.outCubic(clamp(r.t, 0, 1));
+      const p = r.from.clone().lerp(r.to, u);
+      if (r.t < 1) {
+        burst('sparkle', p, { count: 1, speed: 0.3, up: 0, gravity: -2, life: 0.4, size: 0.08, colors: ['#fff3a8', '#ffffff'] });
+        continue;
+      }
+      burst('sparkle', r.to, { count: 70, speed: 7.5, spread: 1.2, up: 0.4, gravity: -1.6, life: 1.5, size: 0.16, drag: 1.4, colors: r.colors });
+      burst('sparkle', r.to, { count: 24, speed: 3, spread: 1, up: 0.2, gravity: -1, life: 1.9, size: 0.1, drag: 1.2, colors: ['#ffffff'] });
+      fx.rockets.splice(i, 1);
+    }
+  });
+  if (!catching) return null;
+  return (
+    <mesh
+      ref={catcher}
+      visible={false}
+      onPointerDown={(ev) => {
+        if (!skyTap) return;
+        ev.stopPropagation();
+        skyTap(ev.point.clone());
+      }}
+    >
+      <planeGeometry args={[120, 120]} />
+    </mesh>
+  );
+}
+
+// -------------------------------------------------------------- hide and seek
+
+const bushMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, side: THREE.DoubleSide });
+
+function Bushes() {
+  const groups = useRef<(THREE.Group | null)[]>([]);
+  const st = useRef({ t: 0 });
+  const geos = useMemo(() => [bushGeometry(2), bushGeometry(5), bushGeometry(8)], []);
+  useFrame((_, raw) => {
+    const dt = frameDt(raw);
+    st.current.t += dt;
+    const b = fx.bushes;
+    for (let i = 0; i < 3; i++) {
+      const g = groups.current[i];
+      if (!g) continue;
+      const it = b.items[i];
+      const show = b.active && !!it && it.scale > 0.01;
+      g.visible = show;
+      if (!show) continue;
+      it.wiggle = Math.max(0, it.wiggle - dt * 1.6);
+      g.position.copy(it.pos);
+      g.rotation.set(0, it.heading, Math.sin(st.current.t * 26) * 0.12 * it.wiggle);
+      g.scale.set(it.scale * (1 + Math.sin(st.current.t * 30) * 0.04 * it.wiggle), it.scale, it.scale);
+    }
+  });
+  return (
+    <>
+      {geos.map((geo, i) => (
+        <group key={i} ref={(el) => (groups.current[i] = el)} visible={false}>
+          <mesh geometry={geo} material={bushMat} castShadow raycast={() => null} />
+          <mesh
+            visible={false}
+            position={[0, 0.55, 0]}
+            onPointerDown={(ev) => {
+              if (!bushTap) return;
+              ev.stopPropagation();
+              bushTap(i);
+            }}
+          >
+            <sphereGeometry args={[0.95, 10, 8]} />
+          </mesh>
+        </group>
+      ))}
+    </>
   );
 }
 
@@ -441,6 +692,10 @@ export function EventProps() {
       <Egg />
       <PrizeShowcase />
       <HandTarget />
+      <IntroStar />
+      <Balloons />
+      <Fireworks />
+      <Bushes />
       <Pterodactyl />
     </>
   );
